@@ -1,8 +1,8 @@
 # Iftaar Finance Portal
 
-A full-stack finance portal for managing donations, expenses, cash flow, and budgets for iftaar drives — built with Next.js 15, React 19, TypeScript, and Supabase.
+A full-stack finance portal for managing donations, expenses, cash flow, and budgets for iftaar drives — built with Next.js 16, React 19, TypeScript, and Supabase.
 
-![Next.js](https://img.shields.io/badge/Next.js_15-black?style=flat-square&logo=next.js)
+![Next.js](https://img.shields.io/badge/Next.js_16-black?style=flat-square&logo=next.js)
 ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
@@ -50,7 +50,7 @@ A full-stack finance portal for managing donations, expenses, cash flow, and bud
 
 | Technology | Role |
 |---|---|
-| **Next.js 15** (App Router) | Framework, server components, server actions |
+| **Next.js 16** (App Router) | Framework, server components, server actions |
 | **React 19** | UI with `useActionState` for form handling |
 | **TypeScript 5** | Type safety |
 | **Supabase** | Auth (password-based) + PostgreSQL database |
