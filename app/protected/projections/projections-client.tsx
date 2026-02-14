@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -15,10 +14,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 
+type BankBalance = {
+  balance?: number;
+};
+
+type CashBalance = {
+  balance_pkr?: number;
+};
+
+type DriveSummary = {
+  cause_id: string | null;
+  cause_name: string | null;
+  date: string | null;
+  total_budget_pkr: number | null;
+  total_spent_pkr: number | null;
+  remaining_budget_pkr: number | null;
+};
+
 interface ProjectionsClientProps {
-  bankBalances: any[];
-  cashBalances: any[];
-  driveSummaries: any[];
+  bankBalances: BankBalance[];
+  cashBalances: CashBalance[];
+  driveSummaries: DriveSummary[];
 }
 
 export function ProjectionsClient({
@@ -29,17 +45,17 @@ export function ProjectionsClient({
   const [excludedDrives, setExcludedDrives] = useState<Set<string>>(new Set());
 
   const totalBankFunds = bankBalances.reduce(
-    (sum: number, b: any) => sum + (b.balance ?? 0),
+    (sum: number, b: BankBalance) => sum + (b.balance ?? 0),
     0
   );
   const totalCashFunds = cashBalances.reduce(
-    (sum: number, c: any) => sum + (c.balance_pkr ?? 0),
+    (sum: number, c: CashBalance) => sum + (c.balance_pkr ?? 0),
     0
   );
   const currentBalance = totalBankFunds + totalCashFunds;
 
   const upcomingDrives = driveSummaries.filter(
-    (d: any) => d.date && new Date(d.date) >= new Date()
+    (d: DriveSummary) => d.date && new Date(d.date) >= new Date()
   );
 
   const toggleDrive = (id: string) => {
@@ -53,8 +69,8 @@ export function ProjectionsClient({
 
   // Build runway table
   let runningBalance = currentBalance;
-  const runwayData = upcomingDrives.map((drive: any) => {
-    const included = !excludedDrives.has(drive.cause_id);
+  const runwayData = upcomingDrives.map((drive: DriveSummary) => {
+    const included = drive.cause_id ? !excludedDrives.has(drive.cause_id) : true;
     const remainingBudget = drive.remaining_budget_pkr ?? 0;
     const cost = included ? remainingBudget : 0;
     runningBalance -= cost;
@@ -115,7 +131,7 @@ export function ProjectionsClient({
                     {formatCurrency(currentBalance)}
                   </TableCell>
                 </TableRow>
-                {runwayData.map((drive: any) => (
+                {runwayData.map((drive) => (
                   <TableRow
                     key={drive.cause_id}
                     className={!drive.included ? "opacity-50" : ""}
@@ -124,7 +140,7 @@ export function ProjectionsClient({
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={drive.included}
-                          onCheckedChange={() => toggleDrive(drive.cause_id)}
+                          onCheckedChange={() => drive.cause_id && toggleDrive(drive.cause_id)}
                         />
                       </div>
                     </TableCell>

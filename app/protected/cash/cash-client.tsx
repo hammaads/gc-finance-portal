@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRightLeft, Landmark, Plus } from "lucide-react";
+import { ArrowRightLeft, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { createCashTransfer, createCashDeposit } from "@/lib/actions/cash";

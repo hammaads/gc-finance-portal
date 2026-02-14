@@ -17,18 +17,49 @@ import {
   Wallet,
   TrendingUp,
   HandCoins,
-  Receipt,
   Calendar,
   MapPin,
   Plus,
 } from "lucide-react";
 import { formatCurrency, formatDate, ledgerTypeLabel } from "@/lib/format";
 
+type BankBalance = {
+  balance?: number;
+  currency_code?: string;
+  currency_symbol?: string;
+};
+
+type CashBalance = {
+  balance_pkr?: number;
+};
+
+type DriveSummary = {
+  cause_id?: string;
+  cause_name?: string;
+  date?: string | null;
+  location?: string | null;
+  total_budget_pkr?: number;
+  total_spent_pkr?: number;
+  remaining_budget_pkr?: number;
+  total_donations_pkr?: number;
+};
+
+type RecentEntry = {
+  id: string;
+  type?: string;
+  amount_pkr?: number;
+  date: string;
+  currencies?: {
+    symbol?: string;
+  };
+  amount?: number;
+};
+
 interface DashboardContentProps {
-  bankBalances: any[];
-  cashBalances: any[];
-  driveSummaries: any[];
-  recentEntries: any[];
+  bankBalances: BankBalance[];
+  cashBalances: CashBalance[];
+  driveSummaries: DriveSummary[];
+  recentEntries: RecentEntry[];
 }
 
 export function DashboardContent({
@@ -38,25 +69,21 @@ export function DashboardContent({
   recentEntries,
 }: DashboardContentProps) {
   const totalBankFunds = bankBalances.reduce(
-    (sum: number, b: any) => sum + (b.balance ?? 0) * (b.currency_code === "PKR" ? 1 : 1),
+    (sum: number, b: BankBalance) => sum + (b.balance ?? 0) * (b.currency_code === "PKR" ? 1 : 1),
     0
   );
   const totalCashFunds = cashBalances.reduce(
-    (sum: number, c: any) => sum + (c.balance_pkr ?? 0),
+    (sum: number, c: CashBalance) => sum + (c.balance_pkr ?? 0),
     0
   );
   const totalFunds = totalBankFunds + totalCashFunds;
 
   const totalDonations = recentEntries
-    .filter((e: any) => e.type?.startsWith("donation_"))
-    .reduce((sum: number, e: any) => sum + (e.amount_pkr ?? 0), 0);
-
-  const totalExpenses = recentEntries
-    .filter((e: any) => e.type?.startsWith("expense_"))
-    .reduce((sum: number, e: any) => sum + (e.amount_pkr ?? 0), 0);
+    .filter((e: RecentEntry) => e.type?.startsWith("donation_"))
+    .reduce((sum: number, e: RecentEntry) => sum + (e.amount_pkr ?? 0), 0);
 
   const upcomingDrives = driveSummaries.filter(
-    (d: any) => d.date && new Date(d.date) >= new Date()
+    (d: DriveSummary) => d.date && new Date(d.date) >= new Date()
   );
 
   return (
@@ -107,7 +134,7 @@ export function DashboardContent({
           <CardContent>
             <div className="text-2xl font-bold">{bankBalances.length}</div>
             <p className="text-xs text-muted-foreground">
-              {bankBalances.map((b: any) => `${b.currency_symbol} ${(b.balance ?? 0).toLocaleString()}`).join(" | ") || "No accounts"}
+              {bankBalances.map((b: BankBalance) => `${b.currency_symbol ?? ""} ${(b.balance ?? 0).toLocaleString()}`).join(" | ") || "No accounts"}
             </p>
           </CardContent>
         </Card>
@@ -150,7 +177,7 @@ export function DashboardContent({
               <p className="text-sm text-muted-foreground">No upcoming drives scheduled.</p>
             ) : (
               <div className="space-y-4">
-                {upcomingDrives.slice(0, 5).map((drive: any) => (
+                {upcomingDrives.slice(0, 5).map((drive: DriveSummary) => (
                   <Link
                     key={drive.cause_id}
                     href={`/protected/drives/${drive.cause_id}`}
@@ -206,7 +233,7 @@ export function DashboardContent({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentEntries.map((entry: any) => (
+                  {recentEntries.map((entry: RecentEntry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="text-sm">
                         {formatDate(entry.date)}
@@ -215,7 +242,7 @@ export function DashboardContent({
                         <Badge
                           variant={entry.type?.startsWith("donation") ? "default" : "secondary"}
                         >
-                          {ledgerTypeLabel(entry.type)}
+                          {ledgerTypeLabel(entry.type ?? "")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-sm">

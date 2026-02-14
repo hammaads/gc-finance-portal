@@ -38,18 +38,70 @@ import { createExpense, deleteExpense } from "@/lib/actions/expenses";
 
 // ── Types ──
 
+type Expense = {
+  id: string;
+  type: string;
+  amount: number | string;
+  exchange_rate_to_pkr: number | string;
+  date: string;
+  description: string | null;
+  expense_categories?: {
+    name: string;
+  } | null;
+  currencies?: {
+    code?: string;
+    symbol?: string;
+  } | null;
+  causes?: {
+    name: string;
+  } | null;
+  bank_accounts?: {
+    account_name: string;
+  } | null;
+  from_user?: {
+    display_name: string;
+  } | null;
+};
+
+type ExpenseCategory = {
+  id: string;
+  name: string;
+};
+
+type Currency = {
+  id: string;
+  code: string;
+  symbol: string;
+  exchange_rate_to_pkr: number;
+};
+
+type BankAccount = {
+  id: string;
+  account_name: string;
+};
+
+type Cause = {
+  id: string;
+  name: string;
+};
+
+type Profile = {
+  id: string;
+  display_name: string;
+};
+
 interface ExpensesClientProps {
-  expenses: any[];
-  categories: any[];
-  currencies: any[];
-  bankAccounts: any[];
-  causes: any[];
-  profiles: any[];
+  expenses: Expense[];
+  categories: ExpenseCategory[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  profiles: Profile[];
 }
 
 // ── Delete Expense Dialog ──
 
-function DeleteExpenseDialog({ expense }: { expense: any }) {
+function DeleteExpenseDialog({ expense }: { expense: Expense }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -114,11 +166,11 @@ function AddExpenseDialog({
   causes,
   profiles,
 }: {
-  categories: any[];
-  currencies: any[];
-  bankAccounts: any[];
-  causes: any[];
-  profiles: any[];
+  categories: ExpenseCategory[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  profiles: Profile[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -139,7 +191,7 @@ function AddExpenseDialog({
         resetForm();
         router.refresh();
       } else {
-        const errors = (result as any).error;
+        const errors = (result as { error?: Record<string, string[]> }).error;
         const firstError =
           errors && typeof errors === "object"
             ? Object.values(errors).flat().join(", ")
@@ -163,7 +215,7 @@ function AddExpenseDialog({
 
   function handleCurrencyChange(id: string) {
     setCurrencyId(id);
-    const currency = currencies.find((c: any) => c.id === id);
+    const currency = currencies.find((c: Currency) => c.id === id);
     if (currency) {
       setExchangeRate(String(currency.exchange_rate_to_pkr));
     }
@@ -241,7 +293,7 @@ function AddExpenseDialog({
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat: any) => (
+                {categories.map((cat: ExpenseCategory) => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {cat.name}
                   </SelectItem>
@@ -270,7 +322,7 @@ function AddExpenseDialog({
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map((cur: any) => (
+                  {currencies.map((cur: Currency) => (
                     <SelectItem key={cur.id} value={cur.id}>
                       {cur.code} ({cur.symbol})
                     </SelectItem>
@@ -325,7 +377,7 @@ function AddExpenseDialog({
                 <SelectValue placeholder="Select cause" />
               </SelectTrigger>
               <SelectContent>
-                {causes.map((cause: any) => (
+                {causes.map((cause: Cause) => (
                   <SelectItem key={cause.id} value={cause.id}>
                     {cause.name}
                   </SelectItem>
@@ -343,7 +395,7 @@ function AddExpenseDialog({
                   <SelectValue placeholder="Select bank account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {bankAccounts.map((acc: any) => (
+                  {bankAccounts.map((acc: BankAccount) => (
                     <SelectItem key={acc.id} value={acc.id}>
                       {acc.account_name}
                     </SelectItem>
@@ -359,7 +411,7 @@ function AddExpenseDialog({
                   <SelectValue placeholder="Select volunteer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {profiles.map((profile: any) => (
+                  {profiles.map((profile: Profile) => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.display_name}
                     </SelectItem>

@@ -42,4 +42,12 @@ yarn-error.log*
 next-env.d.ts
 .agents/
 .claude/
-.cursor/skills/supabase-postgres-best-practices
+.cursor/
+
+# Personal/workflow files
+QUICK_START_CHECKLIST.md
+REVIEW_NOTES_TEMPLATE.md
+REVIEW_PLAN.md
+ledger_entries_verification.txt
+schema.sql
+schema_verification.md

@@ -6,9 +6,27 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  // Debug: Log what we're getting (remove after fixing)
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Missing Supabase environment variables:');
+    console.error('URL:', supabaseUrl ? 'Present' : 'MISSING');
+    console.error('Key:', supabaseKey ? 'Present' : 'MISSING');
+  }
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set in environment variables');
+  }
+
+  if (!supabaseKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set in environment variables');
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {

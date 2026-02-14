@@ -47,11 +47,16 @@ export async function createDonor(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("donors").insert(parsed.data);
+  const { data, error } = await supabase
+    .from("donors")
+    .insert(parsed.data)
+    .select()
+    .single();
   if (error) return { error: { name: [error.message] } };
 
   revalidatePath("/protected/donors");
-  return { success: true };
+  revalidatePath("/protected/donations");
+  return { success: true, donor: data };
 }
 
 export async function updateDonor(formData: FormData) {
