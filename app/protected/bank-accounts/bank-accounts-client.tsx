@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -37,10 +37,10 @@ import {
   updateBankAccount,
   deleteBankAccount,
 } from "@/lib/actions/bank-accounts";
+import { type BankAccountBalanceRow } from "@/lib/actions/bank-accounts";
 import { formatCurrency } from "@/lib/format";
-import type { Tables } from "@/lib/types/database";
 
-type BankAccountBalance = Tables<"bank_account_balances">;
+type BankAccountBalance = BankAccountBalanceRow;
 
 type Currency = {
   id: string;
@@ -61,8 +61,12 @@ export function BankAccountsClient({
   currencies,
 }: BankAccountsClientProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccountBalance | null>(null);
+
+  // Defer Radix Dialog render until after mount to avoid server/client ID hydration mismatch
+  useEffect(() => setMounted(true), []);
 
   // Create action
   const [createState, createAction, createPending] = useActionState(
@@ -107,16 +111,17 @@ export function BankAccountsClient({
 
   return (
     <div className="space-y-4">
-      {/* Add Account Dialog */}
+      {/* Add Account Dialog - only render after mount to avoid Radix ID hydration mismatch */}
       <div className="flex justify-end">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 size-4" />
-              Add Account
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
+        {mounted ? (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 size-4" />
+                Add Account
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Bank Account</DialogTitle>
               <DialogDescription>
@@ -190,9 +195,16 @@ export function BankAccountsClient({
             </form>
           </DialogContent>
         </Dialog>
+        ) : (
+          <Button type="button" tabIndex={-1} aria-hidden>
+            <Plus className="mr-2 size-4" />
+            Add Account
+          </Button>
+        )}
       </div>
 
-      {/* Edit Account Dialog */}
+      {/* Edit Account Dialog - only render after mount to avoid Radix ID hydration mismatch */}
+      {mounted && (
       <Dialog
         open={!!editingAccount}
         onOpenChange={(open) => !open && setEditingAccount(null)}
@@ -293,6 +305,7 @@ export function BankAccountsClient({
           )}
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Accounts Table */}
       <div className="rounded-md border">

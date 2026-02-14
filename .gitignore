@@ -45,6 +45,7 @@ next-env.d.ts
 .cursor/
 
 # Personal/workflow files
+QA_MANUAL_TESTING_STRATEGY.md
 QUICK_START_CHECKLIST.md
 REVIEW_NOTES_TEMPLATE.md
 REVIEW_PLAN.md

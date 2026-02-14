@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
+import { getBankAccountBalances } from "@/lib/actions/bank-accounts";
 import { ReportsClient } from "./reports-client";
 
 async function ReportsData() {
@@ -9,7 +10,7 @@ async function ReportsData() {
   const [
     { data: donations },
     { data: expenses },
-    { data: bankBalances },
+    bankBalances,
     { data: driveSummaries },
   ] = await Promise.all([
     supabase
@@ -24,7 +25,7 @@ async function ReportsData() {
       .in("type", ["expense_bank", "expense_cash"])
       .is("deleted_at", null)
       .order("date", { ascending: false }),
-    supabase.from("bank_account_balances").select("*"),
+    getBankAccountBalances(),
     supabase.from("drive_financial_summary").select("*"),
   ]);
 
@@ -32,7 +33,7 @@ async function ReportsData() {
     <ReportsClient
       donations={donations ?? []}
       expenses={expenses ?? []}
-      bankBalances={bankBalances ?? []}
+      bankBalances={bankBalances}
       driveSummaries={driveSummaries ?? []}
     />
   );

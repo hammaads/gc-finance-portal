@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 type BankBalance = {
-  balance?: number;
+  balance?: number | null;
 };
 
 type CashBalance = {

@@ -40,13 +40,13 @@ type Expense = {
 };
 
 type BankBalance = {
-  account_name: string;
-  bank_name: string;
-  currency_code: string;
-  opening_balance: number;
-  total_deposits: number;
-  total_withdrawals: number;
-  balance: number;
+  account_name?: string | null;
+  bank_name?: string | null;
+  currency_code?: string | null;
+  opening_balance?: number | null;
+  total_deposits?: number | null;
+  total_withdrawals?: number | null;
+  balance?: number | null;
 };
 
 type DriveSummary = {

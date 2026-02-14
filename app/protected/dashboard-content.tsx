@@ -24,9 +24,9 @@ import {
 import { formatCurrency, formatDate, ledgerTypeLabel } from "@/lib/format";
 
 type BankBalance = {
-  balance?: number;
-  currency_code?: string;
-  currency_symbol?: string;
+  balance?: number | null;
+  currency_code?: string | null;
+  currency_symbol?: string | null;
 };
 
 type CashBalance = {
