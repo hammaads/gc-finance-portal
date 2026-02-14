@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { budgetItemSchema } from "@/lib/schemas/budget";
+import { templateSchema } from "@/lib/schemas/templates";
 import { revalidatePath } from "next/cache";
 
 export async function getBudgetItems(causeId: string) {
@@ -93,13 +94,85 @@ export async function getDriveTemplates() {
   return data;
 }
 
-export async function saveDriveTemplate(name: string, templateData: unknown[]) {
+export async function getTemplate(id: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("drive_templates")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function createDriveTemplate(formData: FormData) {
+  const name = formData.get("name") as string;
+  const itemsJson = formData.get("items") as string;
+
+  if (!itemsJson) {
+    return { error: { items: ["Add at least one item"] } };
+  }
+
+  let items: unknown;
+  try {
+    items = JSON.parse(itemsJson);
+  } catch {
+    return { error: { items: ["Invalid items format"] } };
+  }
+
+  const parsed = templateSchema.safeParse({ name, items });
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from("drive_templates").insert({
-    name,
-    template_data: templateData,
+    name: parsed.data.name,
+    template_data: { items: parsed.data.items },
   });
-  if (error) return { error: error.message };
+
+  if (error) return { error: { name: [error.message] } };
+
+  revalidatePath("/protected/settings");
+  return { success: true };
+}
+
+export async function updateDriveTemplate(formData: FormData) {
+  const id = formData.get("id") as string;
+  const name = formData.get("name") as string;
+  const itemsJson = formData.get("items") as string;
+
+  if (!itemsJson) {
+    return { error: { items: ["Add at least one item"] } };
+  }
+
+  let items: unknown;
+  try {
+    items = JSON.parse(itemsJson);
+  } catch {
+    return { error: { items: ["Invalid items format"] } };
+  }
+
+  const parsed = templateSchema.safeParse({ id, name, items });
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("drive_templates")
+    .update({
+      name: parsed.data.name,
+      template_data: { items: parsed.data.items },
+    })
+    .eq("id", id);
+
+  if (error) return { error: { name: [error.message] } };
+
+  revalidatePath("/protected/settings");
   return { success: true };
 }
 
@@ -110,5 +183,28 @@ export async function deleteDriveTemplate(id: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { error: error.message };
+
+  revalidatePath("/protected/settings");
+  return { success: true };
+}
+
+export async function recalculateBudgetItems(
+  causeId: string,
+  _newHeadcount: number
+) {
+  const supabase = await createClient();
+
+  const { data: items, error: fetchError } = await supabase
+    .from("budget_items")
+    .select("*")
+    .eq("cause_id", causeId)
+    .is("deleted_at", null);
+
+  if (fetchError) return { error: fetchError.message };
+  if (!items || items.length === 0) return { success: true };
+
+  // Note: Full recalculation requires template linkage (template_id on causes).
+  // budget_items stores quantity/unit_price but not people_per_unit.
+  // For MVP, no-op - budget items retain their current quantities.
   return { success: true };
 }

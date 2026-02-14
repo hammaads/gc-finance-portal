@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   createExpenseCategory,
@@ -34,7 +34,23 @@ import {
   updateCurrency,
   deleteCurrency,
 } from "@/lib/actions/settings";
-import { deleteDriveTemplate } from "@/lib/actions/budget";
+import {
+  createDriveTemplate,
+  updateDriveTemplate,
+  deleteDriveTemplate,
+} from "@/lib/actions/budget";
+import { Card } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { TemplateItem } from "@/lib/schemas/templates";
+import { CategoryCombobox } from "@/components/ui/category-combobox";
+import { cn } from "@/lib/utils";
 
 // ── Types ──
 
@@ -496,6 +512,884 @@ function DeleteCurrencyDialog({ currency }: { currency: Currency }) {
   );
 }
 
+// ── Create Template Dialog ──
+
+type TemplateItemDraft = {
+  type: "variable" | "fixed";
+  category_id: string;
+  description: string;
+  people_per_unit?: number | string;
+  price_per_unit: number | string;
+  currency_id: string;
+  exchange_rate_to_pkr?: number | string;
+};
+
+function getEmptyVariableItem(defaultCurrencyId: string): TemplateItemDraft {
+  return {
+    type: "variable",
+    category_id: "",
+    description: "",
+    people_per_unit: 1,
+    price_per_unit: 0,
+    currency_id: defaultCurrencyId,
+    exchange_rate_to_pkr: 1,
+  };
+}
+
+function getEmptyFixedItem(defaultCurrencyId: string): TemplateItemDraft {
+  return {
+    type: "fixed",
+    category_id: "",
+    description: "",
+    price_per_unit: 0,
+    currency_id: defaultCurrencyId,
+    exchange_rate_to_pkr: 1,
+  };
+}
+
+function getDefaultCurrencyId(currencies: Currency[]): string {
+  const pkr = currencies.find((c) => c.is_base || c.code === "PKR");
+  return pkr?.id ?? currencies[0]?.id ?? "";
+}
+
+
+type FieldErrors = {
+  name?: boolean;
+  items?: Record<
+    number,
+    {
+      description?: boolean;
+      category_id?: boolean;
+      currency_id?: boolean;
+    }
+  >;
+};
+
+const ERROR_MSG = "Please fill in this field.";
+
+function FieldError({ show }: { show?: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="flex items-center gap-2 text-sm text-destructive">
+      <AlertCircle className="size-4 shrink-0" />
+      {ERROR_MSG}
+    </p>
+  );
+}
+
+function CreateTemplateDialog({
+  categories,
+  currencies,
+}: {
+  categories: Category[];
+  currencies: Currency[];
+}) {
+  const router = useRouter();
+  const defaultCurrencyId = getDefaultCurrencyId(currencies);
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<TemplateItemDraft[]>(() => [
+    getEmptyVariableItem(defaultCurrencyId),
+  ]);
+  const [nameValue, setNameValue] = useState("");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const addItem = () => {
+    setItems((prev) => [...prev, getEmptyVariableItem(defaultCurrencyId)]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (
+    index: number,
+    updates: Partial<TemplateItemDraft>
+  ) => {
+    setItems(
+      items.map((item, i) =>
+        i === index ? { ...item, ...updates } : item
+      )
+    );
+  };
+
+  const validate = (): boolean => {
+    const next: FieldErrors = {};
+    if (!nameValue.trim()) next.name = true;
+
+    const itemErrs: FieldErrors["items"] = {};
+    items.forEach((item, i) => {
+      const e: NonNullable<FieldErrors["items"]>[number] = {};
+      if (!item.description.trim()) e.description = true;
+      if (!item.category_id) e.category_id = true;
+      if (!item.currency_id) e.currency_id = true;
+      if (Object.keys(e).length > 0) itemErrs[i] = e;
+    });
+    if (Object.keys(itemErrs).length > 0) next.items = itemErrs;
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const result = await createDriveTemplate(formData);
+    if ("success" in result && result.success) {
+      toast.success("Template created");
+      setOpen(false);
+      setItems([getEmptyVariableItem(defaultCurrencyId)]);
+      setNameValue("");
+      setErrors({});
+      router.refresh();
+    } else {
+      toast.error("Failed to create template");
+    }
+    setSubmitting(false);
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      setItems([getEmptyVariableItem(defaultCurrencyId)]);
+      setNameValue("");
+      setErrors({});
+    }
+    setOpen(isOpen);
+  };
+
+  const itemsToSubmit = items.map((item) => {
+    if (item.type === "variable") {
+      return {
+        type: "variable" as const,
+        category_id: item.category_id,
+        description: item.description,
+        people_per_unit: Number(item.people_per_unit) || 1,
+        price_per_unit: Number(item.price_per_unit) || 0,
+        currency_id: item.currency_id,
+      };
+    }
+    return {
+      type: "fixed" as const,
+      category_id: item.category_id,
+      description: item.description,
+      price_per_unit: Number(item.price_per_unit) || 0,
+      currency_id: item.currency_id,
+    };
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="mr-1 size-4" />
+          Create Template
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Budget Template</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="name" value={nameValue} />
+          <input type="hidden" name="items" value={JSON.stringify(itemsToSubmit)} />
+          <div className="space-y-2">
+            <Label htmlFor="create-template-name">Template Name</Label>
+            <Input
+              id="create-template-name"
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              placeholder="e.g. Standard Iftar Drive"
+              aria-invalid={!!errors.name}
+            />
+            <FieldError show={errors.name} />
+          </div>
+
+          <div className="space-y-4">
+            <Label>Budget Items</Label>
+
+            {items.map((item, index) => {
+              const ie = errors.items?.[index];
+              return (
+              <Card key={index} className="p-3 gap-3 relative">
+                <div className="absolute top-2 right-2">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    onClick={() => removeItem(index)}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2 pr-8">
+                  <Label htmlFor={`item-desc-${index}`}>Description</Label>
+                  <Input
+                    id={`item-desc-${index}`}
+                    value={item.description}
+                    onChange={(e) =>
+                      updateItem(index, { description: e.target.value })
+                    }
+                    placeholder="e.g. Biryani 10kg Daig"
+                    aria-invalid={!!ie?.description}
+                  />
+                  <FieldError show={ie?.description} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <CategoryCombobox
+                    categories={categories}
+                    value={item.category_id}
+                    onChange={(v) => updateItem(index, { category_id: v })}
+                    placeholder="Search or select category"
+                    hasError={!!ie?.category_id}
+                  />
+                  <FieldError show={ie?.category_id} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                    <RadioGroup
+                      value={item.type}
+                      onValueChange={(v) =>
+                        updateItem(index, {
+                          type: v as "variable" | "fixed",
+                          ...(v === "fixed"
+                            ? { people_per_unit: undefined }
+                            : { people_per_unit: 1 }),
+                        })
+                      }
+                    >
+                      <div className="flex gap-6">
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="variable" id={`var-${index}`} />
+                          <Label
+                            htmlFor={`var-${index}`}
+                            className={cn(
+                              "cursor-pointer font-normal transition-colors",
+                              item.type === "variable" && "font-medium text-foreground"
+                            )}
+                          >
+                            Variable
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="fixed" id={`fix-${index}`} />
+                          <Label
+                            htmlFor={`fix-${index}`}
+                            className={cn(
+                              "cursor-pointer font-normal transition-colors",
+                              item.type === "fixed" && "font-medium text-foreground"
+                            )}
+                          >
+                            Fixed
+                          </Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                </div>
+
+                {item.type === "variable" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`item-people-${index}`}>
+                        People per unit
+                      </Label>
+                      <Input
+                        id={`item-people-${index}`}
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        value={
+                          typeof item.people_per_unit === "number"
+                            ? String(item.people_per_unit)
+                            : (item.people_per_unit ?? "")
+                        }
+                        onChange={(e) =>
+                          updateItem(index, {
+                            people_per_unit: e.target.value,
+                          })
+                        }
+                        onFocus={(e) => e.target.select()}
+                        placeholder="e.g. 2"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`item-price-${index}`}>
+                        Price per unit
+                      </Label>
+                      <Input
+                        id={`item-price-${index}`}
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={
+                          typeof item.price_per_unit === "number"
+                            ? String(item.price_per_unit)
+                            : (item.price_per_unit ?? "")
+                        }
+                        onChange={(e) =>
+                          updateItem(index, {
+                            price_per_unit: e.target.value,
+                          })
+                        }
+                        onFocus={(e) => e.target.select()}
+                        placeholder="e.g. 220"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {item.type === "fixed" && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`item-price-fixed-${index}`}>
+                      Price per unit
+                    </Label>
+                    <Input
+                      id={`item-price-fixed-${index}`}
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={
+                        typeof item.price_per_unit === "number"
+                          ? String(item.price_per_unit)
+                          : (item.price_per_unit ?? "")
+                      }
+                      onChange={(e) =>
+                        updateItem(index, {
+                          price_per_unit: e.target.value,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      placeholder="e.g. 35000"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select
+                      value={item.currency_id || undefined}
+                      onValueChange={(v) => {
+                        const currency = currencies.find((c) => c.id === v);
+                        updateItem(index, {
+                          currency_id: v,
+                          exchange_rate_to_pkr: currency?.exchange_rate_to_pkr ?? 1,
+                        });
+                      }}
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        aria-invalid={!!ie?.currency_id}
+                      >
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((cur) => (
+                          <SelectItem key={cur.id} value={cur.id}>
+                            {cur.code} ({cur.symbol})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError show={ie?.currency_id} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`item-rate-${index}`}>
+                      Exchange Rate to PKR
+                    </Label>
+                    <Input
+                      id={`item-rate-${index}`}
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={
+                        typeof item.exchange_rate_to_pkr === "number"
+                          ? String(item.exchange_rate_to_pkr)
+                          : (item.exchange_rate_to_pkr ?? "1")
+                      }
+                      onChange={(e) =>
+                        updateItem(index, {
+                          exchange_rate_to_pkr: e.target.value,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+              </Card>
+              );
+            })}
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={addItem}
+              className="w-full"
+            >
+              <Plus className="mr-1 size-3" />
+              Add Item
+            </Button>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={submitting || items.length === 0}>
+              {submitting ? "Creating..." : "Create Template"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Edit Template Dialog ──
+
+function EditTemplateDialog({
+  template,
+  categories,
+  currencies,
+}: {
+  template: Template;
+  categories: Category[];
+  currencies: Currency[];
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const defaultCurrencyId = getDefaultCurrencyId(currencies);
+
+  const raw = template.template_data;
+  const existingItems = Array.isArray(raw)
+    ? raw
+    : (raw as { items?: TemplateItem[] })?.items ?? [];
+
+  const [items, setItems] = useState<TemplateItemDraft[]>(() => {
+    const mapped = existingItems.map(
+      (item: { type?: string } & Record<string, unknown>) => {
+        const isVariable = item.type === "variable";
+        const currencyId = String(item.currency_id ?? "");
+        const currency = currencies.find((c) => c.id === currencyId);
+        const exchangeRate = Number(item.exchange_rate_to_pkr) || currency?.exchange_rate_to_pkr || 1;
+        
+        if (isVariable) {
+          return {
+            type: "variable" as const,
+            category_id: String(item.category_id ?? ""),
+            description: String(item.description ?? ""),
+            people_per_unit: Number(item.people_per_unit) || 1,
+            price_per_unit: Number(item.price_per_unit) || 0,
+            currency_id: currencyId,
+            exchange_rate_to_pkr: exchangeRate,
+          };
+        }
+        return {
+          type: "fixed" as const,
+          category_id: String(item.category_id ?? ""),
+          description: String(item.description ?? ""),
+          price_per_unit: Number(item.price_per_unit) || 0,
+          currency_id: currencyId,
+          exchange_rate_to_pkr: exchangeRate,
+        };
+      }
+    );
+    return mapped.length > 0 ? mapped : [getEmptyVariableItem(defaultCurrencyId)];
+  });
+  const [nameValue, setNameValue] = useState(template.name);
+
+  const addItem = () => {
+    setItems((prev) => [...prev, getEmptyVariableItem(defaultCurrencyId)]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (
+    index: number,
+    updates: Partial<TemplateItemDraft>
+  ) => {
+    setItems(
+      items.map((item, i) =>
+        i === index ? { ...item, ...updates } : item
+      )
+    );
+  };
+
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const validate = (): boolean => {
+    const next: FieldErrors = {};
+    if (!nameValue.trim()) next.name = true;
+
+    const itemErrs: FieldErrors["items"] = {};
+    items.forEach((item, i) => {
+      const e: NonNullable<FieldErrors["items"]>[number] = {};
+      if (!item.description.trim()) e.description = true;
+      if (!item.category_id) e.category_id = true;
+      if (!item.currency_id) e.currency_id = true;
+      if (Object.keys(e).length > 0) itemErrs[i] = e;
+    });
+    if (Object.keys(itemErrs).length > 0) next.items = itemErrs;
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const result = await updateDriveTemplate(formData);
+    if ("success" in result && result.success) {
+      toast.success("Template updated");
+      setOpen(false);
+      setErrors({});
+      router.refresh();
+    } else {
+      toast.error("Failed to update template");
+    }
+    setSubmitting(false);
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      setItems(
+        existingItems.map((item) => {
+          if (item.type === "variable") {
+            return {
+              type: "variable" as const,
+              category_id: item.category_id,
+              description: item.description,
+              people_per_unit: item.people_per_unit,
+              price_per_unit: item.price_per_unit,
+              currency_id: item.currency_id,
+            };
+          }
+          return {
+            type: "fixed" as const,
+            category_id: item.category_id,
+            description: item.description,
+            price_per_unit: item.price_per_unit,
+            currency_id: item.currency_id,
+          };
+        })
+      );
+      setNameValue(template.name);
+      setErrors({});
+    }
+    setOpen(isOpen);
+  };
+
+  const itemsToSubmit = items.map((item) => {
+    if (item.type === "variable") {
+      return {
+        type: "variable" as const,
+        category_id: item.category_id,
+        description: item.description,
+        people_per_unit: Number(item.people_per_unit) || 1,
+        price_per_unit: Number(item.price_per_unit) || 0,
+        currency_id: item.currency_id,
+      };
+    }
+    return {
+      type: "fixed" as const,
+      category_id: item.category_id,
+      description: item.description,
+      price_per_unit: Number(item.price_per_unit) || 0,
+      currency_id: item.currency_id,
+    };
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <Pencil className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Template</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="id" value={template.id} />
+          <input type="hidden" name="name" value={nameValue} />
+          <input type="hidden" name="items" value={JSON.stringify(itemsToSubmit)} />
+          <div className="space-y-2">
+            <Label htmlFor="edit-template-name">Template Name</Label>
+            <Input
+              id="edit-template-name"
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              placeholder="e.g. Standard Iftar Drive"
+              aria-invalid={!!errors.name}
+            />
+            <FieldError show={errors.name} />
+          </div>
+
+          <div className="space-y-4">
+            <Label>Budget Items</Label>
+
+            {items.map((item, index) => {
+              const ie = errors.items?.[index];
+              return (
+              <Card key={index} className="p-3 gap-3 relative">
+                <div className="absolute top-2 right-2">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    onClick={() => removeItem(index)}
+                  >
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2 pr-8">
+                  <Label htmlFor={`edit-item-desc-${index}`}>Description</Label>
+                  <Input
+                    id={`edit-item-desc-${index}`}
+                    value={item.description}
+                    onChange={(e) =>
+                      updateItem(index, { description: e.target.value })
+                    }
+                    placeholder="e.g. Biryani 10kg Daig"
+                    aria-invalid={!!ie?.description}
+                  />
+                  <FieldError show={ie?.description} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <CategoryCombobox
+                    categories={categories}
+                    value={item.category_id}
+                    onChange={(v) => updateItem(index, { category_id: v })}
+                    placeholder="Search or select category"
+                    hasError={!!ie?.category_id}
+                  />
+                  <FieldError show={ie?.category_id} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <RadioGroup
+                      value={item.type}
+                      onValueChange={(v) =>
+                        updateItem(index, {
+                          type: v as "variable" | "fixed",
+                          ...(v === "fixed"
+                            ? { people_per_unit: undefined }
+                            : { people_per_unit: 1 }),
+                        })
+                      }
+                    >
+                      <div className="flex gap-6">
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="variable" id={`edit-var-${index}`} />
+                          <Label
+                            htmlFor={`edit-var-${index}`}
+                            className={cn(
+                              "cursor-pointer font-normal transition-colors",
+                              item.type === "variable" && "font-medium text-foreground"
+                            )}
+                          >
+                            Variable
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <RadioGroupItem value="fixed" id={`edit-fix-${index}`} />
+                          <Label
+                            htmlFor={`edit-fix-${index}`}
+                            className={cn(
+                              "cursor-pointer font-normal transition-colors",
+                              item.type === "fixed" && "font-medium text-foreground"
+                            )}
+                          >
+                            Fixed
+                          </Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                </div>
+
+                {item.type === "variable" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-item-people-${index}`}>
+                        People per unit
+                      </Label>
+                      <Input
+                        id={`edit-item-people-${index}`}
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        value={
+                          typeof item.people_per_unit === "number"
+                            ? String(item.people_per_unit)
+                            : (item.people_per_unit ?? "")
+                        }
+                        onChange={(e) =>
+                          updateItem(index, {
+                            people_per_unit: e.target.value,
+                          })
+                        }
+                        onFocus={(e) => e.target.select()}
+                        placeholder="e.g. 2"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-item-price-${index}`}>
+                        Price per unit
+                      </Label>
+                      <Input
+                        id={`edit-item-price-${index}`}
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={
+                          typeof item.price_per_unit === "number"
+                            ? String(item.price_per_unit)
+                            : (item.price_per_unit ?? "")
+                        }
+                        onChange={(e) =>
+                          updateItem(index, {
+                            price_per_unit: e.target.value,
+                          })
+                        }
+                        onFocus={(e) => e.target.select()}
+                        placeholder="e.g. 220"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {item.type === "fixed" && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`edit-item-price-fixed-${index}`}>
+                      Price per unit
+                    </Label>
+                    <Input
+                      id={`edit-item-price-fixed-${index}`}
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={
+                        typeof item.price_per_unit === "number"
+                          ? String(item.price_per_unit)
+                          : (item.price_per_unit ?? "")
+                      }
+                      onChange={(e) =>
+                        updateItem(index, {
+                          price_per_unit: e.target.value,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      placeholder="e.g. 35000"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select
+                      value={item.currency_id || undefined}
+                      onValueChange={(v) => {
+                        const currency = currencies.find((c) => c.id === v);
+                        updateItem(index, {
+                          currency_id: v,
+                          exchange_rate_to_pkr: currency?.exchange_rate_to_pkr ?? 1,
+                        });
+                      }}
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        aria-invalid={!!ie?.currency_id}
+                      >
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currencies.map((cur) => (
+                          <SelectItem key={cur.id} value={cur.id}>
+                            {cur.code} ({cur.symbol})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError show={ie?.currency_id} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`edit-item-rate-${index}`}>
+                      Exchange Rate to PKR
+                    </Label>
+                    <Input
+                      id={`edit-item-rate-${index}`}
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={
+                        typeof item.exchange_rate_to_pkr === "number"
+                          ? String(item.exchange_rate_to_pkr)
+                          : (item.exchange_rate_to_pkr ?? "1")
+                      }
+                      onChange={(e) =>
+                        updateItem(index, {
+                          exchange_rate_to_pkr: e.target.value,
+                        })
+                      }
+                      onFocus={(e) => e.target.select()}
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+              </Card>
+              );
+            })}
+
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={addItem}
+              className="w-full"
+            >
+              <Plus className="mr-1 size-3" />
+              Add Item
+            </Button>
+          </div>
+
+          <DialogFooter className="pt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={submitting || items.length === 0}>
+              {submitting ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Delete Template Dialog ──
 
 function DeleteTemplateDialog({ template }: { template: Template }) {
@@ -660,36 +1554,56 @@ export function SettingsClient({
       <TabsContent value="templates" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium">Budget Templates</h2>
-          <p className="text-sm text-muted-foreground">
-            Templates are created from the drive detail page.
-          </p>
+          <CreateTemplateDialog categories={categories} currencies={currencies} />
         </div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead className="w-24 text-right">Actions</TableHead>
+              <TableHead>Items</TableHead>
+              <TableHead className="w-32 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {templates.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={2}
+                  colSpan={3}
                   className="text-center text-muted-foreground"
                 >
-                  No templates yet. Save one from a drive&apos;s budget page.
+                  No templates yet. Create one to get started.
                 </TableCell>
               </TableRow>
             ) : (
-              templates.map((template) => (
-                <TableRow key={template.id}>
-                  <TableCell>{template.name}</TableCell>
-                  <TableCell className="text-right">
-                    <DeleteTemplateDialog template={template} />
-                  </TableCell>
-                </TableRow>
-              ))
+              templates.map((template) => {
+                const raw = template.template_data;
+                const items = Array.isArray(raw)
+                  ? raw
+                  : (raw as { items?: { type?: string }[] })?.items ?? [];
+                const variableCount = items.filter(
+                  (i: { type?: string }) => i.type === "variable"
+                ).length;
+                const fixedCount = items.filter(
+                  (i: { type?: string }) => i.type === "fixed"
+                ).length;
+                return (
+                  <TableRow key={template.id}>
+                    <TableCell>{template.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {items.length} items ({variableCount} variable, {fixedCount}{" "}
+                      fixed)
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditTemplateDialog
+                        template={template}
+                        categories={categories}
+                        currencies={currencies}
+                      />
+                      <DeleteTemplateDialog template={template} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

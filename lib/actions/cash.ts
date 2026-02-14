@@ -79,3 +79,36 @@ export async function createCashDeposit(formData: FormData) {
   revalidatePath("/protected");
   return { success: true };
 }
+
+export async function getVolunteerTransactions(volunteerId: string) {
+  const supabase = await createClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .eq("id", volunteerId)
+    .single();
+  if (profileError || !profile) return null;
+
+  const { data: entries, error } = await supabase
+    .from("ledger_entries")
+    .select(
+      "*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), bank_accounts(account_name), from_user:profiles!ledger_entries_from_user_id_fkey(display_name), to_user:profiles!ledger_entries_to_user_id_fkey(display_name)"
+    )
+    .or(`from_user_id.eq.${volunteerId},to_user_id.eq.${volunteerId}`)
+    .in("type", [
+      "donation_cash",
+      "expense_cash",
+      "cash_transfer",
+      "cash_deposit",
+    ])
+    .is("deleted_at", null)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return {
+    volunteer: profile,
+    transactions: entries ?? [],
+  };
+}

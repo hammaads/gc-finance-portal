@@ -24,11 +24,15 @@ export async function createExpenseCategory(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("expense_categories").insert({ name: parsed.data.name });
+  const { data: category, error } = await supabase
+    .from("expense_categories")
+    .insert({ name: parsed.data.name })
+    .select()
+    .single();
   if (error) return { error: { name: [error.message] } };
 
   revalidatePath("/protected/settings");
-  return { success: true };
+  return { success: true, category };
 }
 
 export async function updateExpenseCategory(formData: FormData) {

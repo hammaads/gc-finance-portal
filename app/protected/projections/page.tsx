@@ -2,27 +2,30 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { getBankAccountBalances } from "@/lib/actions/bank-accounts";
+import { getDriveTemplates } from "@/lib/actions/budget";
 import { ProjectionsClient } from "./projections-client";
 
 async function ProjectionsData() {
   const supabase = await createClient();
 
-  const [bankBalances, { data: cashBalances }, { data: driveSummaries }] =
+  const [bankBalances, { data: cashBalances }, { data: driveSummaries }, templates] =
     await Promise.all([
-    getBankAccountBalances(),
-    supabase.from("volunteer_cash_balances").select("*"),
-    supabase
-      .from("drive_financial_summary")
-      .select("*")
-      .eq("type", "drive")
-      .order("date"),
-  ]);
+      getBankAccountBalances(),
+      supabase.from("volunteer_cash_balances").select("*"),
+      supabase
+        .from("drive_financial_summary")
+        .select("*")
+        .eq("type", "drive")
+        .order("date"),
+      getDriveTemplates(),
+    ]);
 
   return (
     <ProjectionsClient
       bankBalances={bankBalances ?? []}
       cashBalances={cashBalances ?? []}
       driveSummaries={driveSummaries ?? []}
+      driveTemplates={templates ?? []}
     />
   );
 }

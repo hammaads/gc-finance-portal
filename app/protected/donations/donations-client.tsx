@@ -196,6 +196,12 @@ function AddDonationDialog({
     setToUserId("");
   }
 
+  function getErrorMessage(result: { error?: Record<string, string[] | undefined> }): string {
+    if (!result.error) return "Failed to create donation";
+    const first = Object.values(result.error).flat().find(Boolean);
+    return typeof first === "string" ? first : "Failed to create donation";
+  }
+
   const [, formAction, pending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
       const result = await createDonation(formData);
@@ -205,7 +211,7 @@ function AddDonationDialog({
         resetForm();
         router.refresh();
       } else {
-        toast.error("Failed to create donation");
+        toast.error(getErrorMessage(result));
       }
       return result;
     },
