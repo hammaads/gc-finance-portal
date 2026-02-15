@@ -32,7 +32,7 @@ export async function getCustodyTransfers(ledgerEntryId: string) {
   const { data, error } = await supabase
     .from("custody_transfers")
     .select(
-      "*, from_volunteer:profiles!custody_transfers_from_volunteer_id_fkey(display_name), to_volunteer:profiles!custody_transfers_to_volunteer_id_fkey(display_name), transferred:profiles!custody_transfers_transferred_by_fkey(display_name)",
+      "*, from_volunteer:volunteers!custody_transfers_from_volunteer_id_fkey(name), to_volunteer:volunteers!custody_transfers_to_volunteer_id_fkey(name), transferred:profiles!custody_transfers_transferred_by_fkey(display_name)",
     )
     .eq("ledger_entry_id", ledgerEntryId)
     .order("created_at", { ascending: false });

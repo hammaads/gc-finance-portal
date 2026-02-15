@@ -44,6 +44,7 @@ import { compressImage } from "@/lib/compress-image";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { ItemNameCombobox } from "@/components/ui/item-name-combobox";
+import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 
 // ── Types ──
 
@@ -66,14 +67,14 @@ type BankAccount = {
   } | null;
 };
 type Cause = { id: string; name: string; type: string };
-type Profile = { id: string; display_name: string };
+type Volunteer = { id: string; name: string };
 
 interface BulkAddClientProps {
   categories: ExpenseCategory[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
   itemNames: string[];
   receiptRequired: boolean;
 }
@@ -103,7 +104,7 @@ export function BulkAddClient({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
   itemNames,
   receiptRequired,
 }: BulkAddClientProps) {
@@ -334,18 +335,12 @@ export function BulkAddClient({
               </SelectContent>
             </Select>
           ) : (
-            <Select value={fromUserId} onValueChange={setFromUserId}>
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                {profiles.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <VolunteerCombobox
+              volunteers={volunteers}
+              value={fromUserId}
+              onChange={setFromUserId}
+              placeholder="Type volunteer name..."
+            />
           )}
         </div>
 
@@ -412,21 +407,12 @@ export function BulkAddClient({
             <label className="text-xs font-medium text-muted-foreground">
               Custodian
             </label>
-            <Select
+            <VolunteerCombobox
+              volunteers={volunteers}
               value={custodianId}
-              onValueChange={setCustodianId}
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Who has items?" />
-              </SelectTrigger>
-              <SelectContent>
-                {profiles.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.display_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={setCustodianId}
+              placeholder="Who has these items?"
+            />
           </div>
         )}
       </div>

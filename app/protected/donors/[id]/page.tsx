@@ -79,7 +79,7 @@ async function DonorDetail({ id }: { id: string }) {
                     <TableCell>{donation.causes?.name ?? "-"}</TableCell>
                     <TableCell>
                       {donation.bank_accounts?.account_name ??
-                        donation.to_user?.display_name ??
+                        donation.to_user?.name ??
                         "-"}
                     </TableCell>
                   </TableRow>

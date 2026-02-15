@@ -27,7 +27,7 @@ async function VolunteerDetailContent({ volunteerId }: { volunteerId: string }) 
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {data.volunteer.display_name}
+            {data.volunteer.name}
           </h1>
           <p className="text-muted-foreground">
             Transaction history for this volunteer

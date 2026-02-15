@@ -8,7 +8,7 @@ export async function getDonations() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ledger_entries")
-    .select("*, currencies(code, symbol), donors(name), causes(name), bank_accounts(account_name), to_user:profiles!ledger_entries_to_user_id_fkey(display_name)")
+    .select("*, currencies(code, symbol), donors(name), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name)")
     .in("type", ["donation_bank", "donation_cash"])
     .is("deleted_at", null)
     .order("date", { ascending: false })

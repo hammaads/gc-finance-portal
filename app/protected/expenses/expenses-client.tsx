@@ -56,6 +56,7 @@ import { compressImage } from "@/lib/compress-image";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { ItemNameCombobox } from "@/components/ui/item-name-combobox";
+import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 
 // ── Types ──
 
@@ -73,8 +74,8 @@ type Expense = {
   currencies?: { code?: string; symbol?: string } | null;
   causes?: { name: string } | null;
   bank_accounts?: { account_name: string } | null;
-  from_user?: { display_name: string } | null;
-  custodian?: { display_name: string } | null;
+  from_user?: { name: string } | null;
+  custodian?: { name: string } | null;
 };
 
 type ExpenseCategory = { id: string; name: string };
@@ -96,7 +97,7 @@ type BankAccount = {
   } | null;
 };
 type Cause = { id: string; name: string; type: string };
-type Profile = { id: string; display_name: string };
+type Volunteer = { id: string; name: string };
 
 interface ExpensesClientProps {
   expenses: Expense[];
@@ -104,7 +105,7 @@ interface ExpensesClientProps {
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
   itemNames: string[];
   receiptRequired: boolean;
 }
@@ -251,7 +252,7 @@ export function AddExpenseDialog({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
   itemNames,
   receiptRequired,
 }: {
@@ -259,7 +260,7 @@ export function AddExpenseDialog({
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
   itemNames: string[];
   receiptRequired: boolean;
 }) {
@@ -574,19 +575,16 @@ export function AddExpenseDialog({
             </div>
           )}
 
-          {/* Source + Drive */}
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              {method === "bank" ? "Bank Account" : "Paying Volunteer"}{" "}
-              <span className="text-destructive">*</span>
-              {(method === "bank" ? bankAccountId : fromUserId) && (
-                <Check className="size-3 text-emerald-500" />
-              )}
-            </label>
-            <label className="text-xs font-medium text-muted-foreground">
-              Drive
-            </label>
-            {method === "bank" ? (
+          {/* Source */}
+          {method === "bank" ? (
+            <div className="space-y-1">
+              <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                Bank Account{" "}
+                <span className="text-destructive">*</span>
+                {bankAccountId && (
+                  <Check className="size-3 text-emerald-500" />
+                )}
+              </label>
               <Select
                 value={bankAccountId}
                 onValueChange={setBankAccountId}
@@ -608,26 +606,27 @@ export function AddExpenseDialog({
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
-              <Select value={fromUserId} onValueChange={setFromUserId}>
-                <SelectTrigger
-                  className={cn(
-                    "text-sm transition-colors",
-                    fromUserId &&
-                      "border-emerald-500/50 bg-emerald-500/5",
-                  )}
-                >
-                  <SelectValue placeholder="Select volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                Paying Volunteer{" "}
+                <span className="text-destructive">*</span>
+              </label>
+              <VolunteerCombobox
+                volunteers={volunteers}
+                value={fromUserId}
+                onChange={setFromUserId}
+                placeholder="Type volunteer name..."
+              />
+            </div>
+          )}
+
+          {/* Drive */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">
+              Drive
+            </label>
             <Select
               value={causeId || "__general__"}
               onValueChange={(v) =>
@@ -657,31 +656,13 @@ export function AddExpenseDialog({
             <div className="space-y-1">
               <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 Custodian <span className="text-destructive">*</span>
-                {custodianId && (
-                  <Check className="size-3 text-emerald-500" />
-                )}
               </label>
-              <Select
+              <VolunteerCombobox
+                volunteers={volunteers}
                 value={custodianId}
-                onValueChange={setCustodianId}
-              >
-                <SelectTrigger
-                  className={cn(
-                    "text-sm transition-colors",
-                    custodianId &&
-                      "border-emerald-500/50 bg-emerald-500/5",
-                  )}
-                >
-                  <SelectValue placeholder="Who has these items?" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={setCustodianId}
+                placeholder="Who has these items?"
+              />
             </div>
           )}
 
@@ -751,7 +732,7 @@ export function ExpensesClient({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
   itemNames,
   receiptRequired,
 }: ExpensesClientProps) {
@@ -771,7 +752,7 @@ export function ExpensesClient({
             currencies={currencies}
             bankAccounts={bankAccounts}
             causes={causes}
-            profiles={profiles}
+            volunteers={volunteers}
             itemNames={itemNames}
             receiptRequired={receiptRequired}
           />
@@ -847,7 +828,7 @@ export function ExpensesClient({
                     )}
                   </TableCell>
                   <TableCell>
-                    {expense.custodian?.display_name ?? "-"}
+                    {expense.custodian?.name ?? "-"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DeleteExpenseDialog expense={expense} />

@@ -4,18 +4,18 @@ import { getItemNameSuggestions } from "@/lib/actions/expenses";
 import { getExpenseCategories, getCurrencies } from "@/lib/actions/settings";
 import { getBankAccounts } from "@/lib/actions/bank-accounts";
 import { getCauses } from "@/lib/actions/causes";
-import { getProfiles } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { getReceiptSetting } from "@/lib/actions/receipts";
 import { BulkAddClient } from "./bulk-add-client";
 
 async function BulkAddContent() {
-  const [categories, currencies, bankAccounts, causes, profiles, itemNames, receiptRequired] =
+  const [categories, currencies, bankAccounts, causes, volunteers, itemNames, receiptRequired] =
     await Promise.all([
       getExpenseCategories(),
       getCurrencies(),
       getBankAccounts(),
       getCauses(),
-      getProfiles(),
+      getVolunteers(),
       getItemNameSuggestions(),
       getReceiptSetting(),
     ]);
@@ -26,7 +26,7 @@ async function BulkAddContent() {
       currencies={currencies}
       bankAccounts={bankAccounts}
       causes={causes}
-      profiles={profiles}
+      volunteers={volunteers}
       itemNames={itemNames}
       receiptRequired={receiptRequired}
     />

@@ -6,7 +6,7 @@ import { getBankAccountBalances, getBankAccounts } from "@/lib/actions/bank-acco
 import { getDonors } from "@/lib/actions/donors";
 import { getCurrencies, getExpenseCategories } from "@/lib/actions/settings";
 import { getCauses } from "@/lib/actions/causes";
-import { getProfiles } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { getItemNameSuggestions } from "@/lib/actions/expenses";
 import { getReceiptSetting } from "@/lib/actions/receipts";
 import { DashboardContent } from "./dashboard-content";
@@ -25,7 +25,7 @@ async function DashboardData() {
     currencies,
     bankAccounts,
     causes,
-    profiles,
+    volunteers,
     expenseCategories,
     itemNames,
     receiptRequired,
@@ -35,7 +35,7 @@ async function DashboardData() {
     supabase.from("drive_financial_summary").select("*").eq("type", "drive").order("date"),
     supabase
       .from("ledger_entries")
-      .select("*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), from_user:profiles!ledger_entries_from_user_id_fkey(display_name), to_user:profiles!ledger_entries_to_user_id_fkey(display_name)")
+      .select("*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), from_user:volunteers!ledger_entries_from_user_id_fkey(name), to_user:volunteers!ledger_entries_to_user_id_fkey(name)")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -43,7 +43,7 @@ async function DashboardData() {
     getCurrencies(),
     getBankAccounts(),
     getCauses(),
-    getProfiles(),
+    getVolunteers(),
     getExpenseCategories(),
     getItemNameSuggestions(),
     getReceiptSetting(),
@@ -59,7 +59,7 @@ async function DashboardData() {
       currencies={currencies}
       bankAccounts={bankAccounts}
       causes={causes}
-      profiles={profiles}
+      volunteers={volunteers}
       expenseCategories={expenseCategories}
       itemNames={itemNames}
       receiptRequired={receiptRequired}

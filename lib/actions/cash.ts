@@ -13,16 +13,6 @@ export async function getVolunteerCashBalances() {
   return data;
 }
 
-export async function getProfiles() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("display_name");
-  if (error) throw error;
-  return data;
-}
-
 export async function createCashTransfer(formData: FormData) {
   const parsed = cashTransferSchema.safeParse({
     type: "cash_transfer",
@@ -83,8 +73,8 @@ export async function createCashDeposit(formData: FormData) {
 export async function getVolunteerTransactions(volunteerId: string) {
   const supabase = await createClient();
   const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, display_name")
+    .from("volunteers")
+    .select("id, name")
     .eq("id", volunteerId)
     .single();
   if (profileError || !profile) return null;
@@ -92,7 +82,7 @@ export async function getVolunteerTransactions(volunteerId: string) {
   const { data: entries, error } = await supabase
     .from("ledger_entries")
     .select(
-      "*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), bank_accounts(account_name), from_user:profiles!ledger_entries_from_user_id_fkey(display_name), to_user:profiles!ledger_entries_to_user_id_fkey(display_name)"
+      "*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), bank_accounts(account_name), from_user:volunteers!ledger_entries_from_user_id_fkey(name), to_user:volunteers!ledger_entries_to_user_id_fkey(name)"
     )
     .or(`from_user_id.eq.${volunteerId},to_user_id.eq.${volunteerId}`)
     .in("type", [

@@ -4,7 +4,7 @@ import { getExpenses, getItemNameSuggestions } from "@/lib/actions/expenses";
 import { getExpenseCategories, getCurrencies } from "@/lib/actions/settings";
 import { getBankAccounts } from "@/lib/actions/bank-accounts";
 import { getCauses } from "@/lib/actions/causes";
-import { getProfiles } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { getReceiptSetting } from "@/lib/actions/receipts";
 import { ExpensesClient } from "./expenses-client";
 
@@ -15,7 +15,7 @@ async function ExpensesContent() {
     currencies,
     bankAccounts,
     causes,
-    profiles,
+    volunteers,
     itemNames,
     receiptRequired,
   ] = await Promise.all([
@@ -24,7 +24,7 @@ async function ExpensesContent() {
     getCurrencies(),
     getBankAccounts(),
     getCauses(),
-    getProfiles(),
+    getVolunteers(),
     getItemNameSuggestions(),
     getReceiptSetting(),
   ]);
@@ -36,7 +36,7 @@ async function ExpensesContent() {
       currencies={currencies}
       bankAccounts={bankAccounts}
       causes={causes}
-      profiles={profiles}
+      volunteers={volunteers}
       itemNames={itemNames}
       receiptRequired={receiptRequired}
     />

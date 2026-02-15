@@ -85,9 +85,9 @@ type Cause = {
   type: string;
 };
 
-type Profile = {
+type Volunteer = {
   id: string;
-  display_name: string;
+  name: string;
 };
 
 type ExpenseCategory = {
@@ -104,7 +104,7 @@ interface DashboardContentProps {
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
   expenseCategories: ExpenseCategory[];
   itemNames: string[];
   receiptRequired: boolean;
@@ -119,7 +119,7 @@ export function DashboardContent({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
   expenseCategories,
   itemNames,
   receiptRequired,
@@ -157,14 +157,14 @@ export function DashboardContent({
             currencies={currencies}
             bankAccounts={bankAccounts}
             causes={causes}
-            profiles={profiles}
+            volunteers={volunteers}
           />
           <AddExpenseDialog
             categories={expenseCategories}
             currencies={currencies}
             bankAccounts={bankAccounts}
             causes={causes}
-            profiles={profiles}
+            volunteers={volunteers}
             itemNames={itemNames}
             receiptRequired={receiptRequired}
           />

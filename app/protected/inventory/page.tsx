@@ -5,15 +5,15 @@ import {
   getInventoryByCustodian,
 } from "@/lib/actions/inventory";
 import { getCauses } from "@/lib/actions/causes";
-import { getProfiles } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { InventoryClient } from "./inventory-client";
 
 async function InventoryContent() {
-  const [inventoryItems, custodianData, causes, profiles] = await Promise.all([
+  const [inventoryItems, custodianData, causes, volunteers] = await Promise.all([
     getInventoryItems(),
     getInventoryByCustodian(),
     getCauses(),
-    getProfiles(),
+    getVolunteers(),
   ]);
 
   return (
@@ -21,7 +21,7 @@ async function InventoryContent() {
       inventoryItems={inventoryItems}
       custodianData={custodianData}
       causes={causes}
-      profiles={profiles}
+      volunteers={volunteers}
     />
   );
 }

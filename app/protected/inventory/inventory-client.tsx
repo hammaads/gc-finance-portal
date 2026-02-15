@@ -69,13 +69,13 @@ type CustodianEntry = {
 };
 
 type Cause = { id: string; name: string };
-type Profile = { id: string; display_name: string };
+type Volunteer = { id: string; name: string };
 
 interface InventoryClientProps {
   inventoryItems: InventoryItem[];
   custodianData: CustodianEntry[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }
 
 // ── Consume Dialog ──
@@ -198,11 +198,11 @@ function ConsumeDialog({
 function TransferDialog({
   item,
   custodians,
-  profiles,
+  volunteers,
 }: {
   item: InventoryItem;
   custodians: CustodianEntry[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -269,7 +269,7 @@ function TransferDialog({
               </SelectTrigger>
               <SelectContent>
                 {custodians.map((c) => {
-                  const profile = profiles.find(
+                  const profile = volunteers.find(
                     (p) => p.id === c.volunteer_id,
                   );
                   return (
@@ -277,7 +277,7 @@ function TransferDialog({
                       key={c.volunteer_id}
                       value={c.volunteer_id}
                     >
-                      {profile?.display_name ?? "Unknown"} (
+                      {profile?.name ?? "Unknown"} (
                       {Number(c.qty_held)} held)
                     </SelectItem>
                   );
@@ -295,11 +295,11 @@ function TransferDialog({
                 <SelectValue placeholder="Select recipient" />
               </SelectTrigger>
               <SelectContent>
-                {profiles
+                {volunteers
                   .filter((p) => p.id !== fromVolunteerId)
                   .map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.display_name}
+                      {p.name}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -430,7 +430,7 @@ export function InventoryClient({
   inventoryItems,
   custodianData,
   causes,
-  profiles,
+  volunteers,
 }: InventoryClientProps) {
   const [search, setSearch] = useState("");
 
@@ -445,21 +445,21 @@ export function InventoryClient({
       (c) => c.ledger_entry_id === item.ledger_entry_id,
     );
     if (custodians.length === 0) {
-      const p = profiles.find(
+      const p = volunteers.find(
         (pr) => pr.id === item.original_custodian_id,
       );
-      return p?.display_name ?? "-";
+      return p?.name ?? "-";
     }
     if (custodians.length === 1) {
-      const p = profiles.find(
+      const p = volunteers.find(
         (pr) => pr.id === custodians[0].volunteer_id,
       );
-      return p?.display_name ?? "-";
+      return p?.name ?? "-";
     }
     // Multiple custodians
     const names = custodians.map((c) => {
-      const p = profiles.find((pr) => pr.id === c.volunteer_id);
-      return `${p?.display_name ?? "?"}: ${Number(c.qty_held)}`;
+      const p = volunteers.find((pr) => pr.id === c.volunteer_id);
+      return `${p?.name ?? "?"}: ${Number(c.qty_held)}`;
     });
     return (
       <TooltipProvider>
@@ -553,7 +553,7 @@ export function InventoryClient({
                     <TransferDialog
                       item={item}
                       custodians={custodians}
-                      profiles={profiles}
+                      volunteers={volunteers}
                     />
                     <AdjustDialog item={item} />
                   </TableCell>

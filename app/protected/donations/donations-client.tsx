@@ -62,7 +62,7 @@ type Donation = {
   donors: { name: string } | null;
   causes: { name: string } | null;
   bank_accounts: { account_name: string } | null;
-  to_user: { display_name: string } | null;
+  to_user: { name: string } | null;
 };
 
 type Donor = {
@@ -95,9 +95,9 @@ type Cause = {
   type: string;
 };
 
-type Profile = {
+type Volunteer = {
   id: string;
-  display_name: string;
+  name: string;
 };
 
 interface DonationsClientProps {
@@ -106,7 +106,7 @@ interface DonationsClientProps {
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }
 
 // ── Delete Donation Dialog ──
@@ -174,13 +174,13 @@ export function AddDonationDialog({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
 }: {
   donors: Donor[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -431,9 +431,9 @@ export function AddDonationDialog({
                   <SelectValue placeholder="Select volunteer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
+                  {volunteers.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -506,7 +506,7 @@ export function DonationsClient({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
 }: DonationsClientProps) {
   return (
     <div className="space-y-4">
@@ -517,7 +517,7 @@ export function DonationsClient({
           currencies={currencies}
           bankAccounts={bankAccounts}
           causes={causes}
-          profiles={profiles}
+          volunteers={volunteers}
         />
       </div>
       <Table>
@@ -552,7 +552,7 @@ export function DonationsClient({
               const recipient =
                 donation.type === "donation_bank"
                   ? donation.bank_accounts?.account_name ?? "-"
-                  : donation.to_user?.display_name ?? "-";
+                  : donation.to_user?.name ?? "-";
 
               return (
                 <TableRow key={donation.id}>

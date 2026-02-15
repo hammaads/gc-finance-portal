@@ -115,7 +115,7 @@ export async function getBankAccountStatement(accountId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ledger_entries")
-    .select("*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), from_user:profiles!ledger_entries_from_user_id_fkey(display_name), to_user:profiles!ledger_entries_to_user_id_fkey(display_name)")
+    .select("*, currencies(code, symbol), donors(name), causes(name), expense_categories(name), from_user:volunteers!ledger_entries_from_user_id_fkey(name), to_user:volunteers!ledger_entries_to_user_id_fkey(name)")
     .eq("bank_account_id", accountId)
     .is("deleted_at", null)
     .order("date", { ascending: false })
