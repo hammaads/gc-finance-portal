@@ -26,6 +26,24 @@ function emptyToNull(value: FormDataEntryValue | null): string | null {
 export async function createDonation(formData: FormData) {
   const type = formData.get("type") as string;
 
+  // Resolve donor: use existing donor_id or auto-create from name + phone
+  let donorId = emptyToNull(formData.get("donor_id"));
+  const donorName = emptyToNull(formData.get("donor_name"));
+  const donorPhone = emptyToNull(formData.get("donor_phone"));
+
+  if (!donorId && donorName) {
+    const supabase = await createClient();
+    const { data: newDonor, error: donorError } = await supabase
+      .from("donors")
+      .insert({ name: donorName, phone: donorPhone })
+      .select("id")
+      .single();
+    if (donorError) return { error: { donor_id: [donorError.message] } };
+    donorId = newDonor.id;
+  }
+
+  if (!donorId) return { error: { donor_id: ["Donor name is required"] } };
+
   const raw: Record<string, unknown> = {
     type,
     amount: formData.get("amount"),
@@ -33,7 +51,7 @@ export async function createDonation(formData: FormData) {
     exchange_rate_to_pkr: formData.get("exchange_rate_to_pkr"),
     date: formData.get("date"),
     description: emptyToNull(formData.get("description")),
-    donor_id: formData.get("donor_id"),
+    donor_id: donorId,
     cause_id: emptyToNull(formData.get("cause_id")),
   };
 
@@ -57,6 +75,7 @@ export async function createDonation(formData: FormData) {
   if (error) return { error: { amount: [error.message] } };
 
   revalidatePath("/protected/donations");
+  revalidatePath("/protected/donors");
   revalidatePath("/protected");
   return { success: true };
 }

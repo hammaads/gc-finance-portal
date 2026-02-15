@@ -42,7 +42,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createDonation, deleteDonation } from "@/lib/actions/donations";
-import { DonorCombobox } from "@/components/ui/donor-combobox";
+import { DonorAutocomplete } from "@/components/ui/donor-combobox";
 import { cn } from "@/lib/utils";
 
 // ── Types ──
@@ -189,6 +189,8 @@ function AddDonationDialog({
     "donation_bank",
   );
   const [donorId, setDonorId] = useState("");
+  const [donorName, setDonorName] = useState("");
+  const [donorPhone, setDonorPhone] = useState("");
   const [causeId, setCauseId] = useState("");
   const [bankAccountId, setBankAccountId] = useState(
     bankAccounts.length > 0 ? bankAccounts[0].id : "",
@@ -216,6 +218,8 @@ function AddDonationDialog({
   function resetForm() {
     setMethod("donation_bank");
     setDonorId("");
+    setDonorName("");
+    setDonorPhone("");
     setCauseId("");
     setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setToUserId("");
@@ -291,16 +295,18 @@ function AddDonationDialog({
           </div>
 
           {/* Donor */}
-          <div className="space-y-2">
-            <Label>Donor</Label>
-            <input type="hidden" name="donor_id" value={donorId} />
-            <DonorCombobox
-              donors={donors}
-              value={donorId}
-              onChange={setDonorId}
-              placeholder="Search or select donor"
-            />
-          </div>
+          <input type="hidden" name="donor_id" value={donorId} />
+          <input type="hidden" name="donor_name" value={donorName} />
+          <input type="hidden" name="donor_phone" value={donorPhone} />
+          <DonorAutocomplete
+            donors={donors}
+            donorId={donorId}
+            donorName={donorName}
+            donorPhone={donorPhone}
+            onDonorIdChange={setDonorId}
+            onDonorNameChange={setDonorName}
+            onDonorPhoneChange={setDonorPhone}
+          />
 
           {/* Amount */}
           <input type="hidden" name="currency_id" value={activeCurrency.id} />

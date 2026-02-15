@@ -1,28 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createDonor } from "@/lib/actions/donors";
-import { toast } from "sonner";
 
 type Donor = {
   id: string;
@@ -31,219 +11,163 @@ type Donor = {
   email: string | null;
 };
 
-type DonorComboboxProps = {
+type DonorAutocompleteProps = {
   donors: Donor[];
-  value: string;
-  onChange: (donorId: string) => void;
-  placeholder?: string;
+  donorId: string;
+  donorName: string;
+  donorPhone: string;
+  onDonorIdChange: (id: string) => void;
+  onDonorNameChange: (name: string) => void;
+  onDonorPhoneChange: (phone: string) => void;
   disabled?: boolean;
 };
 
-export function DonorCombobox({
+export function DonorAutocomplete({
   donors,
-  value,
-  onChange,
-  placeholder = "Search or select donor",
+  donorId,
+  donorName,
+  donorPhone,
+  onDonorIdChange,
+  onDonorNameChange,
+  onDonorPhoneChange,
   disabled = false,
-}: DonorComboboxProps) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [addName, setAddName] = useState("");
-  const [addPhone, setAddPhone] = useState("");
-  const [addEmail, setAddEmail] = useState("");
-  const [isPending, startTransition] = useTransition();
+}: DonorAutocompleteProps) {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
-  const selectedDonor = donors.find((d) => d.id === value);
+  const filtered = donorName.trim()
+    ? donors.filter((d) =>
+        d.name.toLowerCase().includes(donorName.toLowerCase()),
+      )
+    : [];
 
-  function handleSelectDonor(donorId: string) {
-    onChange(donorId);
-    setOpen(false);
-  }
-
-  function handleShowAddForm(prefillName = "") {
-    setAddName(prefillName);
-    setAddPhone("");
-    setAddEmail("");
-    setShowAddForm(true);
-  }
-
-  function handleCancelAddForm() {
-    setShowAddForm(false);
-    setAddName("");
-    setAddPhone("");
-    setAddEmail("");
-  }
-
-  async function handleCreateDonor(e: React.FormEvent) {
-    e.preventDefault();
-    const formData = new FormData();
-    formData.set("name", addName.trim());
-    formData.set("phone", addPhone.trim() || "");
-    formData.set("email", addEmail.trim() || "");
-
-    startTransition(async () => {
-      const result = await createDonor(formData);
-      if ("error" in result && result.error) {
-        toast.error(result.error.name?.[0] ?? "Failed to add donor");
-        return;
+  const handleNameChange = useCallback(
+    (value: string) => {
+      onDonorNameChange(value);
+      if (donorId) {
+        onDonorIdChange("");
       }
-      if ("donor" in result && result.donor) {
-        onChange(result.donor.id);
-        setShowAddForm(false);
-        setOpen(false);
-        handleCancelAddForm();
-        router.refresh();
-        toast.success("Donor added");
-      }
-    });
+      setShowSuggestions(true);
+      setHighlightIndex(-1);
+    },
+    [donorId, onDonorIdChange, onDonorNameChange],
+  );
+
+  function handleSelect(donor: Donor) {
+    onDonorIdChange(donor.id);
+    onDonorNameChange(donor.name);
+    onDonorPhoneChange(donor.phone ?? "");
+    setShowSuggestions(false);
+    setHighlightIndex(-1);
   }
 
-  function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) {
-      setShowAddForm(false);
-      setAddName("");
-      setAddPhone("");
-      setAddEmail("");
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showSuggestions || filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev < filtered.length - 1 ? prev + 1 : 0,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev > 0 ? prev - 1 : filtered.length - 1,
+      );
+    } else if (e.key === "Enter" && highlightIndex >= 0) {
+      e.preventDefault();
+      handleSelect(filtered[highlightIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
     }
-    setOpen(nextOpen);
   }
+
+  useEffect(() => {
+    if (
+      highlightIndex >= 0 &&
+      listRef.current &&
+      listRef.current.children[highlightIndex]
+    ) {
+      (listRef.current.children[highlightIndex] as HTMLElement).scrollIntoView({
+        block: "nearest",
+      });
+    }
+  }, [highlightIndex]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
+    <div className="space-y-3">
+      <div className="relative" ref={containerRef}>
+        <Label htmlFor="donor-name">Donor Name</Label>
+        <Input
+          id="donor-name"
+          type="text"
+          value={donorName}
+          onChange={(e) => handleNameChange(e.target.value)}
+          onFocus={() => {
+            if (donorName.trim() && !donorId) setShowSuggestions(true);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Type donor name"
+          autoComplete="off"
           disabled={disabled}
-          className={cn(
-            "w-full justify-between font-normal",
-            !selectedDonor && "text-muted-foreground",
-          )}
-        >
-          {selectedDonor ? selectedDonor.name : placeholder}
-          <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        {showAddForm ? (
-          <form onSubmit={handleCreateDonor} className="space-y-3 p-3">
-            <div className="space-y-2">
-              <Label htmlFor="add-donor-name">Name</Label>
-              <Input
-                id="add-donor-name"
-                value={addName}
-                onChange={(e) => setAddName(e.target.value)}
-                placeholder="Donor name"
-                required
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-donor-phone">Phone (optional)</Label>
-              <Input
-                id="add-donor-phone"
-                type="tel"
-                value={addPhone}
-                onChange={(e) => setAddPhone(e.target.value)}
-                placeholder="Phone number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-donor-email">Email (optional)</Label>
-              <Input
-                id="add-donor-email"
-                type="email"
-                value={addEmail}
-                onChange={(e) => setAddEmail(e.target.value)}
-                placeholder="Email address"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCancelAddForm}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={isPending}>
-                {isPending ? "Adding..." : "Add Donor"}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <Command
-            shouldFilter={false}
-            className="rounded-lg border-0 shadow-none"
+          className="mt-1"
+        />
+        {showSuggestions && filtered.length > 0 && (
+          <ul
+            ref={listRef}
+            className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
           >
-            <CommandInput
-              placeholder="Search donors..."
-              value={searchText}
-              onValueChange={setSearchText}
-            />
-            <CommandList>
-              {(() => {
-                const filteredDonors = donors.filter(
-                  (donor) =>
-                    !searchText ||
-                    donor.name.toLowerCase().includes(searchText.toLowerCase()),
-                );
-                return (
-                  <>
-                    <CommandGroup>
-                      {filteredDonors.map((donor) => (
-                        <CommandItem
-                          key={donor.id}
-                          value={donor.id}
-                          onSelect={() => handleSelectDonor(donor.id)}
-                        >
-                          {donor.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                    <CommandEmpty>
-                      <div className="py-4 text-center">
-                        <p className="mb-2 text-sm text-muted-foreground">
-                          No donors found.
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-auto w-full justify-center rounded-md border bg-muted/60 py-3 font-medium hover:bg-muted/80"
-                          onClick={() => handleShowAddForm(searchText)}
-                        >
-                          <Plus className="mr-2 size-4" />
-                          Add &quot;{searchText || "new donor"}&quot; as new
-                          donor
-                        </Button>
-                      </div>
-                    </CommandEmpty>
-                    {filteredDonors.length > 0 && (
-                      <>
-                        <CommandSeparator className="my-2" />
-                        <CommandGroup>
-                          <CommandItem
-                            onSelect={() => handleShowAddForm(searchText)}
-                            className="mt-2 cursor-pointer rounded-md border bg-muted/50 py-2.5 font-medium data-[selected=true]:bg-muted/70"
-                          >
-                            <Plus className="mr-2 size-4" />
-                            Add new donor
-                          </CommandItem>
-                        </CommandGroup>
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-            </CommandList>
-          </Command>
+            {filtered.map((donor, i) => (
+              <li
+                key={donor.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(donor);
+                }}
+                onMouseEnter={() => setHighlightIndex(i)}
+                className={`flex cursor-pointer flex-col rounded-sm px-2 py-1.5 text-sm ${
+                  i === highlightIndex ? "bg-accent text-accent-foreground" : ""
+                }`}
+              >
+                <span>{donor.name}</span>
+                {donor.phone && (
+                  <span className="text-xs text-muted-foreground">
+                    {donor.phone}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
-      </PopoverContent>
-    </Popover>
+      </div>
+
+      <div>
+        <Label htmlFor="donor-phone">Phone Number</Label>
+        <Input
+          id="donor-phone"
+          type="tel"
+          value={donorPhone}
+          onChange={(e) => onDonorPhoneChange(e.target.value)}
+          placeholder="+92 300 1234567"
+          disabled={disabled}
+          className="mt-1"
+        />
+      </div>
+    </div>
   );
 }
