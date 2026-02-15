@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Check, PackagePlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type ItemNameComboboxProps = {
   itemNames: string[];
@@ -22,6 +24,7 @@ export function ItemNameCombobox({
 }: ItemNameComboboxProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [selectedFromList, setSelectedFromList] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -31,14 +34,22 @@ export function ItemNameCombobox({
       )
     : [];
 
+  const isExisting =
+    selectedFromList &&
+    value.trim().length > 0 &&
+    itemNames.some((n) => n.toLowerCase() === value.toLowerCase());
+  const isNew = !isExisting && value.trim().length > 0;
+
   function handleChange(text: string) {
     onChange(text);
+    setSelectedFromList(false);
     setShowSuggestions(true);
     setHighlightIndex(-1);
   }
 
   function handleSelect(name: string) {
     onChange(name);
+    setSelectedFromList(true);
     setShowSuggestions(false);
     setHighlightIndex(-1);
   }
@@ -90,43 +101,62 @@ export function ItemNameCombobox({
   }, []);
 
   return (
-    <div ref={containerRef} className="relative">
-      <Input
-        type="text"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => {
-          if (value.trim()) setShowSuggestions(true);
-        }}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        autoComplete="off"
-        disabled={disabled}
-        aria-invalid={hasError}
-      />
-      {showSuggestions && filtered.length > 0 && (
-        <ul
-          ref={listRef}
-          className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
-        >
-          {filtered.map((name, i) => (
-            <li
-              key={name}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleSelect(name);
-              }}
-              onMouseEnter={() => setHighlightIndex(i)}
-              className={`cursor-pointer rounded-sm px-2 py-1.5 text-sm ${
-                i === highlightIndex
-                  ? "bg-accent text-accent-foreground"
-                  : ""
-              }`}
-            >
-              {name}
-            </li>
-          ))}
-        </ul>
+    <div ref={containerRef} className="space-y-1">
+      <div className="relative">
+        <Input
+          type="text"
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={() => {
+            if (value.trim()) setShowSuggestions(true);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoComplete="off"
+          disabled={disabled}
+          aria-invalid={hasError}
+          className={cn(
+            "transition-colors",
+            isExisting && "border-emerald-500/50 bg-emerald-500/5",
+            isNew && "border-blue-500/50 bg-blue-500/5",
+          )}
+        />
+        {showSuggestions && filtered.length > 0 && (
+          <ul
+            ref={listRef}
+            className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+          >
+            {filtered.map((name, i) => (
+              <li
+                key={name}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(name);
+                }}
+                onMouseEnter={() => setHighlightIndex(i)}
+                className={`cursor-pointer rounded-sm px-2 py-1.5 text-sm ${
+                  i === highlightIndex
+                    ? "bg-accent text-accent-foreground"
+                    : ""
+                }`}
+              >
+                {name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {isExisting && (
+        <p className="flex items-center gap-1 text-[11px] text-emerald-600">
+          <Check className="size-3" />
+          Adds to existing inventory item
+        </p>
+      )}
+      {isNew && (
+        <p className="flex items-center gap-1 text-[11px] text-blue-600">
+          <PackagePlus className="size-3" />
+          New inventory item
+        </p>
       )}
     </div>
   );
