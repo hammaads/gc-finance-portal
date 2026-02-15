@@ -10,6 +10,7 @@ import {
   Landmark,
   Wallet,
   Users,
+  Package,
   TrendingUp,
   FileText,
   Settings,
@@ -47,6 +48,7 @@ const financeNav = [
   { title: "Bank Accounts", href: "/protected/bank-accounts", icon: Landmark },
   { title: "Cash Management", href: "/protected/cash", icon: Wallet },
   { title: "Donors", href: "/protected/donors", icon: Users },
+  { title: "Inventory", href: "/protected/inventory", icon: Package },
 ];
 
 const planningNav = [

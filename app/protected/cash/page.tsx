@@ -1,14 +1,15 @@
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getVolunteerCashBalances, getProfiles } from "@/lib/actions/cash";
+import { getVolunteerCashBalances } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { getCurrencies } from "@/lib/actions/settings";
 import { getBankAccounts } from "@/lib/actions/bank-accounts";
 import { CashClient } from "./cash-client";
 
 async function CashContent() {
-  const [balances, profiles, currencies, bankAccounts] = await Promise.all([
+  const [balances, volunteers, currencies, bankAccounts] = await Promise.all([
     getVolunteerCashBalances(),
-    getProfiles(),
+    getVolunteers(),
     getCurrencies(),
     getBankAccounts(),
   ]);
@@ -16,7 +17,7 @@ async function CashContent() {
   return (
     <CashClient
       balances={balances}
-      profiles={profiles}
+      volunteers={volunteers}
       currencies={currencies}
       bankAccounts={bankAccounts}
     />

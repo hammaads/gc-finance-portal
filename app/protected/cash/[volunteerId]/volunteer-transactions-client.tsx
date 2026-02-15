@@ -39,8 +39,8 @@ type Transaction = {
   causes: { name: string } | null;
   expense_categories: { name: string } | null;
   bank_accounts: { account_name: string } | null;
-  from_user: { display_name: string } | null;
-  to_user: { display_name: string } | null;
+  from_user: { name: string } | null;
+  to_user: { name: string } | null;
 };
 
 function getDirection(
@@ -61,8 +61,8 @@ function getCounterparty(entry: Transaction, volunteerId: string): string {
         .join(" - ") || "-";
     case "cash_transfer":
       return entry.from_user_id === volunteerId
-        ? `To ${entry.to_user?.display_name ?? "Unknown"}`
-        : `From ${entry.from_user?.display_name ?? "Unknown"}`;
+        ? `To ${entry.to_user?.name ?? "Unknown"}`
+        : `From ${entry.from_user?.name ?? "Unknown"}`;
     case "cash_deposit":
       return entry.bank_accounts?.account_name ?? "-";
     default:

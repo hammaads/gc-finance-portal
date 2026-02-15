@@ -22,11 +22,13 @@ import { ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
 import { getCause, getDriveFinancialSummary } from "@/lib/actions/causes";
 import { getBudgetItems, getBudgetVsActual } from "@/lib/actions/budget";
 import { getExpenseCategories, getCurrencies } from "@/lib/actions/settings";
+import { getDriveExpenseBreakdown, getInventoryItems } from "@/lib/actions/inventory";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { DriveDetailClient } from "./drive-detail-client";
+import { DriveExpensesClient } from "./drive-expenses-client";
 
 async function DriveDetailContent({ id }: { id: string }) {
-  const [cause, summary, budgetItems, budgetVsActual, categories, currencies] =
+  const [cause, summary, budgetItems, budgetVsActual, categories, currencies, expenseBreakdown, inventoryItems] =
     await Promise.all([
       getCause(id),
       getDriveFinancialSummary(id).catch(() => null),
@@ -34,6 +36,8 @@ async function DriveDetailContent({ id }: { id: string }) {
       getBudgetVsActual(id),
       getExpenseCategories(),
       getCurrencies(),
+      getDriveExpenseBreakdown(id),
+      getInventoryItems(),
     ]);
 
   return (
@@ -130,11 +134,21 @@ async function DriveDetailContent({ id }: { id: string }) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="budget-plan">
+      <Tabs defaultValue="expenses">
         <TabsList>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="budget-plan">Budget Plan</TabsTrigger>
           <TabsTrigger value="budget-vs-actual">Budget vs Actual</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="expenses" className="space-y-4">
+          <DriveExpensesClient
+            directExpenses={expenseBreakdown.directExpenses}
+            consumedItems={expenseBreakdown.consumedItems}
+            inventoryItems={inventoryItems}
+            causeId={id}
+          />
+        </TabsContent>
 
         <TabsContent value="budget-plan" className="space-y-4">
           <DriveDetailClient

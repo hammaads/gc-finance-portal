@@ -48,7 +48,7 @@ type CashBalance = {
 
 type Profile = {
   id: string;
-  display_name: string;
+  name: string;
 };
 
 type Currency = {
@@ -67,14 +67,14 @@ type BankAccount = {
 
 interface CashClientProps {
   balances: CashBalance[];
-  profiles: Profile[];
+  volunteers: Profile[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
 }
 
 export function CashClient({
   balances,
-  profiles,
+  volunteers,
   currencies,
   bankAccounts,
 }: CashClientProps) {
@@ -208,9 +208,9 @@ export function CashClient({
                     <SelectValue placeholder="Select volunteer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {profiles.map((p) => (
+                    {volunteers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.display_name}
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -229,11 +229,11 @@ export function CashClient({
                     <SelectValue placeholder="Select volunteer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {profiles
+                    {volunteers
                       .filter((p) => p.id !== transferFromId)
                       .map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.display_name}
+                          {p.name}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -387,9 +387,9 @@ export function CashClient({
                     <SelectValue placeholder="Select volunteer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {profiles.map((p) => (
+                    {volunteers.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.display_name}
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

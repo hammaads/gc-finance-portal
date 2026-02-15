@@ -5,18 +5,18 @@ import { getDonors } from "@/lib/actions/donors";
 import { getCurrencies } from "@/lib/actions/settings";
 import { getBankAccounts } from "@/lib/actions/bank-accounts";
 import { getCauses } from "@/lib/actions/causes";
-import { getProfiles } from "@/lib/actions/cash";
+import { getVolunteers } from "@/lib/actions/volunteers";
 import { DonationsClient } from "./donations-client";
 
 async function DonationsContent() {
-  const [donations, donors, currencies, bankAccounts, causes, profiles] =
+  const [donations, donors, currencies, bankAccounts, causes, volunteers] =
     await Promise.all([
       getDonations(),
       getDonors(),
       getCurrencies(),
       getBankAccounts(),
       getCauses(),
-      getProfiles(),
+      getVolunteers(),
     ]);
 
   return (
@@ -26,7 +26,7 @@ async function DonationsContent() {
       currencies={currencies}
       bankAccounts={bankAccounts}
       causes={causes}
-      profiles={profiles}
+      volunteers={volunteers}
     />
   );
 }

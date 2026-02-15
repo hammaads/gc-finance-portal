@@ -21,16 +21,22 @@ export const donationCashSchema = baseLedgerSchema.extend({
   to_user_id: z.string().uuid("Select a receiving volunteer"),
 });
 
-export const expenseBankSchema = baseLedgerSchema.extend({
-  type: z.literal("expense_bank"),
-  bank_account_id: z.string().uuid("Select a bank account"),
+const expenseBaseSchema = baseLedgerSchema.extend({
+  item_name: z.string().min(1, "Item name is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unit_price: z.coerce.number().min(0, "Unit price must be non-negative"),
   category_id: z.string().uuid("Select a category"),
+  custodian_id: z.string().uuid().optional().nullable(),
 });
 
-export const expenseCashSchema = baseLedgerSchema.extend({
+export const expenseBankSchema = expenseBaseSchema.extend({
+  type: z.literal("expense_bank"),
+  bank_account_id: z.string().uuid("Select a bank account"),
+});
+
+export const expenseCashSchema = expenseBaseSchema.extend({
   type: z.literal("expense_cash"),
   from_user_id: z.string().uuid("Select a paying volunteer"),
-  category_id: z.string().uuid("Select a category"),
 });
 
 export const cashTransferSchema = baseLedgerSchema.extend({

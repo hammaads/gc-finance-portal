@@ -42,6 +42,7 @@ import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createDonation, deleteDonation } from "@/lib/actions/donations";
 import { DonorAutocomplete } from "@/components/ui/donor-combobox";
+import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 import { cn } from "@/lib/utils";
 
 // ── Types ──
@@ -62,7 +63,7 @@ type Donation = {
   donors: { name: string } | null;
   causes: { name: string } | null;
   bank_accounts: { account_name: string } | null;
-  to_user: { display_name: string } | null;
+  to_user: { name: string } | null;
 };
 
 type Donor = {
@@ -95,9 +96,9 @@ type Cause = {
   type: string;
 };
 
-type Profile = {
+type Volunteer = {
   id: string;
-  display_name: string;
+  name: string;
 };
 
 interface DonationsClientProps {
@@ -106,7 +107,7 @@ interface DonationsClientProps {
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }
 
 // ── Delete Donation Dialog ──
@@ -174,13 +175,13 @@ export function AddDonationDialog({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
 }: {
   donors: Donor[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
-  profiles: Profile[];
+  volunteers: Volunteer[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -421,30 +422,18 @@ export function AddDonationDialog({
                 </SelectContent>
               </Select>
             ) : (
-              <Select value={toUserId} onValueChange={setToUserId}>
-                <SelectTrigger
-                  className={cn(
-                    "text-sm transition-colors",
-                    toUserId && "border-emerald-500/50 bg-emerald-500/5",
-                  )}
-                >
-                  <SelectValue placeholder="Select volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <VolunteerCombobox
+                volunteers={volunteers}
+                value={toUserId}
+                onChange={setToUserId}
+              />
             )}
             <Select value={causeId} onValueChange={setCauseId}>
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Optional" />
               </SelectTrigger>
               <SelectContent>
-                {causes.map((cause) => (
+                {causes.filter((c) => c.type !== "drive").map((cause) => (
                   <SelectItem key={cause.id} value={cause.id}>
                     {cause.name}
                   </SelectItem>
@@ -506,7 +495,7 @@ export function DonationsClient({
   currencies,
   bankAccounts,
   causes,
-  profiles,
+  volunteers,
 }: DonationsClientProps) {
   return (
     <div className="space-y-4">
@@ -517,7 +506,7 @@ export function DonationsClient({
           currencies={currencies}
           bankAccounts={bankAccounts}
           causes={causes}
-          profiles={profiles}
+          volunteers={volunteers}
         />
       </div>
       <Table>
@@ -552,7 +541,7 @@ export function DonationsClient({
               const recipient =
                 donation.type === "donation_bank"
                   ? donation.bank_accounts?.account_name ?? "-"
-                  : donation.to_user?.display_name ?? "-";
+                  : donation.to_user?.name ?? "-";
 
               return (
                 <TableRow key={donation.id}>
