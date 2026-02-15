@@ -169,7 +169,7 @@ function DeleteExpenseDialog({ expense }: { expense: Expense }) {
 
 // ── Add Expense Dialog ──
 
-function AddExpenseDialog({
+export function AddExpenseDialog({
   categories,
   currencies,
   bankAccounts,

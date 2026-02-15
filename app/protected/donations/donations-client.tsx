@@ -169,7 +169,7 @@ function DeleteDonationDialog({ donation }: { donation: Donation }) {
 
 // ── Add Donation Dialog ──
 
-function AddDonationDialog({
+export function AddDonationDialog({
   donors,
   currencies,
   bankAccounts,

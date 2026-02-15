@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -19,9 +18,10 @@ import {
   HandCoins,
   Calendar,
   MapPin,
-  Plus,
 } from "lucide-react";
 import { formatCurrency, formatDate, ledgerTypeLabel } from "@/lib/format";
+import { AddDonationDialog } from "./donations/donations-client";
+import { AddExpenseDialog } from "./expenses/expenses-client";
 
 type BankBalance = {
   balance?: number | null;
@@ -55,11 +55,57 @@ type RecentEntry = {
   amount?: number;
 };
 
+type Donor = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+};
+
+type Currency = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  exchange_rate_to_pkr: number;
+  is_base: boolean;
+};
+
+type BankAccount = {
+  id: string;
+  account_name: string;
+  bank_name: string;
+  currency_id: string;
+  currencies: { code: string; symbol: string; exchange_rate_to_pkr: number } | null;
+};
+
+type Cause = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+type Profile = {
+  id: string;
+  display_name: string;
+};
+
+type ExpenseCategory = {
+  id: string;
+  name: string;
+};
+
 interface DashboardContentProps {
   bankBalances: BankBalance[];
   cashBalances: CashBalance[];
   driveSummaries: DriveSummary[];
   recentEntries: RecentEntry[];
+  donors: Donor[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  profiles: Profile[];
+  expenseCategories: ExpenseCategory[];
 }
 
 export function DashboardContent({
@@ -67,6 +113,12 @@ export function DashboardContent({
   cashBalances,
   driveSummaries,
   recentEntries,
+  donors,
+  currencies,
+  bankAccounts,
+  causes,
+  profiles,
+  expenseCategories,
 }: DashboardContentProps) {
   const totalBankFunds = bankBalances.reduce(
     (sum: number, b: BankBalance) => sum + (b.balance ?? 0) * (b.currency_code === "PKR" ? 1 : 1),
@@ -96,18 +148,20 @@ export function DashboardContent({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild size="sm">
-            <Link href="/protected/donations">
-              <Plus className="mr-1 h-4 w-4" />
-              Donation
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/protected/expenses">
-              <Plus className="mr-1 h-4 w-4" />
-              Expense
-            </Link>
-          </Button>
+          <AddDonationDialog
+            donors={donors}
+            currencies={currencies}
+            bankAccounts={bankAccounts}
+            causes={causes}
+            profiles={profiles}
+          />
+          <AddExpenseDialog
+            categories={expenseCategories}
+            currencies={currencies}
+            bankAccounts={bankAccounts}
+            causes={causes}
+            profiles={profiles}
+          />
         </div>
       </div>
 

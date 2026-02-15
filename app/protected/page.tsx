@@ -2,7 +2,11 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getBankAccountBalances } from "@/lib/actions/bank-accounts";
+import { getBankAccountBalances, getBankAccounts } from "@/lib/actions/bank-accounts";
+import { getDonors } from "@/lib/actions/donors";
+import { getCurrencies, getExpenseCategories } from "@/lib/actions/settings";
+import { getCauses } from "@/lib/actions/causes";
+import { getProfiles } from "@/lib/actions/cash";
 import { DashboardContent } from "./dashboard-content";
 
 async function DashboardData() {
@@ -15,6 +19,12 @@ async function DashboardData() {
     { data: cashBalances },
     { data: driveSummaries },
     { data: recentEntries },
+    donors,
+    currencies,
+    bankAccounts,
+    causes,
+    profiles,
+    expenseCategories,
   ] = await Promise.all([
     getBankAccountBalances(),
     supabase.from("volunteer_cash_balances").select("*"),
@@ -25,6 +35,12 @@ async function DashboardData() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
+    getDonors(),
+    getCurrencies(),
+    getBankAccounts(),
+    getCauses(),
+    getProfiles(),
+    getExpenseCategories(),
   ]);
 
   return (
@@ -33,6 +49,12 @@ async function DashboardData() {
       cashBalances={cashBalances ?? []}
       driveSummaries={driveSummaries ?? []}
       recentEntries={recentEntries ?? []}
+      donors={donors}
+      currencies={currencies}
+      bankAccounts={bankAccounts}
+      causes={causes}
+      profiles={profiles}
+      expenseCategories={expenseCategories}
     />
   );
 }
