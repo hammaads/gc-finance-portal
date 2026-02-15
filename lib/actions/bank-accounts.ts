@@ -8,7 +8,7 @@ export async function getBankAccounts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bank_accounts")
-    .select("*, currencies(code, symbol)")
+    .select("*, currencies(code, symbol, exchange_rate_to_pkr)")
     .is("deleted_at", null)
     .order("account_name");
   if (error) throw error;

@@ -4,6 +4,7 @@ export function formatCurrency(amount: number, symbol = "Rs"): string {
 
 export function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("en-PK", {
+    weekday: "short",
     year: "numeric",
     month: "short",
     day: "numeric",

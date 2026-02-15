@@ -31,11 +31,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Trash2, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createDonation, deleteDonation } from "@/lib/actions/donations";
 import { DonorCombobox } from "@/components/ui/donor-combobox";
+import { cn } from "@/lib/utils";
 
 // ── Types ──
 
@@ -78,7 +86,8 @@ type BankAccount = {
   id: string;
   account_name: string;
   bank_name: string;
-  currencies: { code: string; symbol: string } | null;
+  currency_id: string;
+  currencies: { code: string; symbol: string; exchange_rate_to_pkr: number } | null;
 };
 
 type Cause = {
@@ -180,20 +189,37 @@ function AddDonationDialog({
     "donation_bank",
   );
   const [donorId, setDonorId] = useState("");
-  const [currencyId, setCurrencyId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
   const [causeId, setCauseId] = useState("");
-  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccountId, setBankAccountId] = useState(
+    bankAccounts.length > 0 ? bankAccounts[0].id : "",
+  );
   const [toUserId, setToUserId] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
+
+  const baseCurrency = currencies.find((c) => c.is_base) ?? currencies[0];
+  const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
+  const activeCurrency =
+    method === "donation_bank" && selectedBank
+      ? {
+          id: selectedBank.currency_id,
+          code: selectedBank.currencies?.code ?? "PKR",
+          symbol: selectedBank.currencies?.symbol ?? "Rs",
+          exchange_rate: selectedBank.currencies?.exchange_rate_to_pkr ?? 1,
+        }
+      : {
+          id: baseCurrency?.id ?? "",
+          code: baseCurrency?.code ?? "PKR",
+          symbol: baseCurrency?.symbol ?? "Rs",
+          exchange_rate: baseCurrency?.exchange_rate_to_pkr ?? 1,
+        };
 
   function resetForm() {
     setMethod("donation_bank");
     setDonorId("");
-    setCurrencyId("");
-    setExchangeRate("");
     setCauseId("");
-    setBankAccountId("");
+    setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setToUserId("");
+    setDate(new Date());
   }
 
   function getErrorMessage(result: { error?: Record<string, string[] | undefined> }): string {
@@ -218,18 +244,14 @@ function AddDonationDialog({
     null,
   );
 
-  function handleCurrencyChange(value: string) {
-    setCurrencyId(value);
-    const currency = currencies.find((c) => c.id === value);
-    if (currency) {
-      setExchangeRate(String(currency.exchange_rate_to_pkr));
-    }
-  }
-
   function handleMethodChange(value: string) {
     const newMethod = value as "donation_bank" | "donation_cash";
     setMethod(newMethod);
-    setBankAccountId("");
+    setBankAccountId(
+      newMethod === "donation_bank" && bankAccounts.length > 0
+        ? bankAccounts[0].id
+        : "",
+    );
     setToUserId("");
   }
 
@@ -280,66 +302,49 @@ function AddDonationDialog({
             />
           </div>
 
-          {/* Amount & Currency */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-donation-amount">Amount</Label>
-              <Input
-                id="add-donation-amount"
-                name="amount"
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <input type="hidden" name="currency_id" value={currencyId} />
-              <Select
-                value={currencyId}
-                onValueChange={handleCurrencyChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currencies.map((currency) => (
-                    <SelectItem key={currency.id} value={currency.id}>
-                      {currency.code} ({currency.symbol})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Exchange Rate */}
+          {/* Amount */}
+          <input type="hidden" name="currency_id" value={activeCurrency.id} />
+          <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
           <div className="space-y-2">
-            <Label htmlFor="add-donation-rate">Exchange Rate to PKR</Label>
+            <Label htmlFor="add-donation-amount">Amount ({activeCurrency.code})</Label>
             <Input
-              id="add-donation-rate"
-              name="exchange_rate_to_pkr"
+              id="add-donation-amount"
+              name="amount"
               type="number"
               step="any"
               min="0"
-              value={exchangeRate}
-              onChange={(e) => setExchangeRate(e.target.value)}
+              placeholder="0.00"
               required
             />
           </div>
 
           {/* Date */}
+          <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
           <div className="space-y-2">
-            <Label htmlFor="add-donation-date">Date</Label>
-            <Input
-              id="add-donation-date"
-              name="date"
-              type="date"
-              defaultValue={new Date().toISOString().split("T")[0]}
-              required
-            />
+            <Label>Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 size-4" />
+                  {format(date, "EEE, dd MMM yyyy")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  disabled={{ after: new Date() }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Description */}
