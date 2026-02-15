@@ -42,6 +42,7 @@ import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createDonation, deleteDonation } from "@/lib/actions/donations";
 import { DonorAutocomplete } from "@/components/ui/donor-combobox";
+import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 import { cn } from "@/lib/utils";
 
 // ── Types ──
@@ -421,30 +422,18 @@ export function AddDonationDialog({
                 </SelectContent>
               </Select>
             ) : (
-              <Select value={toUserId} onValueChange={setToUserId}>
-                <SelectTrigger
-                  className={cn(
-                    "text-sm transition-colors",
-                    toUserId && "border-emerald-500/50 bg-emerald-500/5",
-                  )}
-                >
-                  <SelectValue placeholder="Select volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {volunteers.map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <VolunteerCombobox
+                volunteers={volunteers}
+                value={toUserId}
+                onChange={setToUserId}
+              />
             )}
             <Select value={causeId} onValueChange={setCauseId}>
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Optional" />
               </SelectTrigger>
               <SelectContent>
-                {causes.map((cause) => (
+                {causes.filter((c) => c.type !== "drive").map((cause) => (
                   <SelectItem key={cause.id} value={cause.id}>
                     {cause.name}
                   </SelectItem>
