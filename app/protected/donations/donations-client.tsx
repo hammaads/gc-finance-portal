@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Trash2, CalendarIcon } from "lucide-react";
+import { Plus, Trash2, CalendarIcon, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -195,6 +195,7 @@ function AddDonationDialog({
     bankAccounts.length > 0 ? bankAccounts[0].id : "",
   );
   const [toUserId, setToUserId] = useState("");
+  const [amount, setAmount] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [showDescription, setShowDescription] = useState(false);
 
@@ -220,6 +221,7 @@ function AddDonationDialog({
     setDonorId("");
     setDonorName("");
     setDonorPhone("");
+    setAmount("");
     setCauseId("");
     setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setToUserId("");
@@ -248,6 +250,11 @@ function AddDonationDialog({
     },
     null,
   );
+
+  const formReady =
+    donorName.trim().length > 0 &&
+    Number(amount) > 0 &&
+    (method === "donation_bank" ? !!bankAccountId : !!toUserId);
 
   function handleMethodChange(value: string) {
     const newMethod = value as "donation_bank" | "donation_cash";
@@ -296,7 +303,9 @@ function AddDonationDialog({
 
           {/* Method toggle */}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Method</label>
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Method <span className="text-destructive">*</span>
+            </label>
             <div className="flex rounded-md border p-0.5">
               <button
                 type="button"
@@ -338,11 +347,12 @@ function AddDonationDialog({
 
           {/* Amount + Date */}
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              Amount ({activeCurrency.code})
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Amount ({activeCurrency.code}) <span className="text-destructive">*</span>
+              {Number(amount) > 0 && <Check className="size-3 text-emerald-500" />}
             </label>
-            <label className="text-xs font-medium text-muted-foreground">
-              Date
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Date <span className="text-destructive">*</span>
             </label>
             <Input
               name="amount"
@@ -351,13 +361,19 @@ function AddDonationDialog({
               min="0"
               placeholder="0.00"
               required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={cn(
+                "transition-colors",
+                Number(amount) > 0 && "border-emerald-500/50 bg-emerald-500/5",
+              )}
             />
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full justify-start text-left text-sm font-normal"
+                  className="w-full justify-start border-emerald-500/50 bg-emerald-500/5 text-left text-sm font-normal transition-colors"
                 >
                   <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
                   <span className="truncate">{format(date, "dd MMM yyyy")}</span>
@@ -377,15 +393,23 @@ function AddDonationDialog({
 
           {/* Destination + Cause */}
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              {method === "donation_bank" ? "Bank Account" : "Receiving Volunteer"}
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              {method === "donation_bank" ? "Bank Account" : "Receiving Volunteer"} <span className="text-destructive">*</span>
+              {(method === "donation_bank" ? bankAccountId : toUserId) && (
+                <Check className="size-3 text-emerald-500" />
+              )}
             </label>
             <label className="text-xs font-medium text-muted-foreground">
               Cause
             </label>
             {method === "donation_bank" ? (
               <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger className="text-sm">
+                <SelectTrigger
+                  className={cn(
+                    "text-sm transition-colors",
+                    bankAccountId && "border-emerald-500/50 bg-emerald-500/5",
+                  )}
+                >
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -398,7 +422,12 @@ function AddDonationDialog({
               </Select>
             ) : (
               <Select value={toUserId} onValueChange={setToUserId}>
-                <SelectTrigger className="text-sm">
+                <SelectTrigger
+                  className={cn(
+                    "text-sm transition-colors",
+                    toUserId && "border-emerald-500/50 bg-emerald-500/5",
+                  )}
+                >
                   <SelectValue placeholder="Select volunteer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -412,7 +441,7 @@ function AddDonationDialog({
             )}
             <Select value={causeId} onValueChange={setCauseId}>
               <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Select cause" />
+                <SelectValue placeholder="Optional" />
               </SelectTrigger>
               <SelectContent>
                 {causes.map((cause) => (
@@ -452,8 +481,15 @@ function AddDonationDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" size="sm" disabled={pending}>
-              {pending ? "Saving..." : "Save"}
+            <Button type="submit" size="sm" disabled={pending || !formReady}>
+              {pending ? (
+                <>
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
             </Button>
           </DialogFooter>
         </form>

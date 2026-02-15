@@ -28,13 +28,20 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Trash2, CalendarIcon, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createExpense, deleteExpense } from "@/lib/actions/expenses";
+import { cn } from "@/lib/utils";
 
 // ── Types ──
 
@@ -78,6 +85,9 @@ type Currency = {
 type BankAccount = {
   id: string;
   account_name: string;
+  bank_name: string;
+  currency_id: string;
+  currencies: { code: string; symbol: string; exchange_rate_to_pkr: number } | null;
 };
 
 type Cause = {
@@ -175,12 +185,32 @@ function AddExpenseDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<"bank" | "cash">("bank");
-  const [currencyId, setCurrencyId] = useState("");
-  const [exchangeRate, setExchangeRate] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [causeId, setCauseId] = useState("");
-  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccountId, setBankAccountId] = useState(
+    bankAccounts.length > 0 ? bankAccounts[0].id : "",
+  );
   const [fromUserId, setFromUserId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
+  const [showDescription, setShowDescription] = useState(false);
+
+  const baseCurrency = currencies.find((c) => c.code === "PKR") ?? currencies[0];
+  const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
+  const activeCurrency =
+    method === "bank" && selectedBank
+      ? {
+          id: selectedBank.currency_id,
+          code: selectedBank.currencies?.code ?? "PKR",
+          symbol: selectedBank.currencies?.symbol ?? "Rs",
+          exchange_rate: selectedBank.currencies?.exchange_rate_to_pkr ?? 1,
+        }
+      : {
+          id: baseCurrency?.id ?? "",
+          code: baseCurrency?.code ?? "PKR",
+          symbol: baseCurrency?.symbol ?? "Rs",
+          exchange_rate: baseCurrency?.exchange_rate_to_pkr ?? 1,
+        };
 
   const [, formAction, pending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
@@ -203,25 +233,21 @@ function AddExpenseDialog({
     null,
   );
 
+  const formReady =
+    !!categoryId &&
+    Number(amount) > 0 &&
+    (method === "bank" ? !!bankAccountId : !!fromUserId);
+
   function resetForm() {
     setMethod("bank");
-    setCurrencyId("");
-    setExchangeRate("");
     setCategoryId("");
     setCauseId("");
-    setBankAccountId("");
+    setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setFromUserId("");
+    setAmount("");
+    setDate(new Date());
+    setShowDescription(false);
   }
-
-  function handleCurrencyChange(id: string) {
-    setCurrencyId(id);
-    const currency = currencies.find((c: Currency) => c.id === id);
-    if (currency) {
-      setExchangeRate(String(currency.exchange_rate_to_pkr));
-    }
-  }
-
-  const today = new Date().toISOString().split("T")[0];
 
   return (
     <Dialog
@@ -237,59 +263,77 @@ function AddExpenseDialog({
           Add Expense
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add Expense</DialogTitle>
+      <DialogContent className="max-w-sm gap-0 p-5">
+        <DialogHeader className="mb-3 space-y-0">
+          <DialogTitle className="text-base">Add Expense</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
-          {/* Hidden inputs for select values */}
+        <form action={formAction} className="space-y-3">
           <input
             type="hidden"
             name="type"
             value={method === "bank" ? "expense_bank" : "expense_cash"}
           />
-          <input type="hidden" name="currency_id" value={currencyId} />
+          <input type="hidden" name="currency_id" value={activeCurrency.id} />
+          <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
           <input type="hidden" name="category_id" value={categoryId} />
+          <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
           {causeId && <input type="hidden" name="cause_id" value={causeId} />}
           {method === "bank" && (
-            <input
-              type="hidden"
-              name="bank_account_id"
-              value={bankAccountId}
-            />
+            <input type="hidden" name="bank_account_id" value={bankAccountId} />
           )}
           {method === "cash" && (
             <input type="hidden" name="from_user_id" value={fromUserId} />
           )}
 
-          {/* Method Toggle */}
-          <div className="space-y-2">
-            <Label>Method</Label>
-            <div className="flex gap-2">
-              <Button
+          {/* Method toggle */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Method <span className="text-destructive">*</span>
+            </label>
+            <div className="flex rounded-md border p-0.5">
+              <button
                 type="button"
-                variant={method === "bank" ? "default" : "outline"}
-                size="sm"
                 onClick={() => setMethod("bank")}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+                  method === "bank"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
                 Bank
-              </Button>
-              <Button
+              </button>
+              <button
                 type="button"
-                variant={method === "cash" ? "default" : "outline"}
-                size="sm"
                 onClick={() => setMethod("cash")}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+                  method === "cash"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
               >
                 Cash
-              </Button>
+              </button>
             </div>
           </div>
 
-          {/* Category */}
-          <div className="space-y-2">
-            <Label>Category</Label>
+          {/* Category + Date */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Category <span className="text-destructive">*</span>
+              {categoryId && <Check className="size-3 text-emerald-500" />}
+            </label>
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Date <span className="text-destructive">*</span>
+            </label>
             <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
+              <SelectTrigger
+                className={cn(
+                  "text-sm transition-colors",
+                  categoryId && "border-emerald-500/50 bg-emerald-500/5",
+                )}
+              >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -300,81 +344,100 @@ function AddExpenseDialog({
                 ))}
               </SelectContent>
             </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start border-emerald-500/50 bg-emerald-500/5 text-left text-sm font-normal transition-colors"
+                >
+                  <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
+                  <span className="truncate">{format(date, "dd MMM yyyy")}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  disabled={{ after: new Date() }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {/* Amount & Currency */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-expense-amount">Amount</Label>
-              <Input
-                id="add-expense-amount"
-                name="amount"
-                type="number"
-                step="any"
-                placeholder="0.00"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Currency</Label>
-              <Select value={currencyId} onValueChange={handleCurrencyChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
+          {/* Amount */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              Amount ({activeCurrency.code}) <span className="text-destructive">*</span>
+              {Number(amount) > 0 && <Check className="size-3 text-emerald-500" />}
+            </label>
+            <Input
+              name="amount"
+              type="number"
+              step="any"
+              min="0"
+              placeholder="0.00"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={cn(
+                "transition-colors",
+                Number(amount) > 0 && "border-emerald-500/50 bg-emerald-500/5",
+              )}
+            />
+          </div>
+
+          {/* Source + Cause */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+              {method === "bank" ? "Bank Account" : "Paying Volunteer"} <span className="text-destructive">*</span>
+              {(method === "bank" ? bankAccountId : fromUserId) && (
+                <Check className="size-3 text-emerald-500" />
+              )}
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">Cause</label>
+            {method === "bank" ? (
+              <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                <SelectTrigger
+                  className={cn(
+                    "text-sm transition-colors",
+                    bankAccountId && "border-emerald-500/50 bg-emerald-500/5",
+                  )}
+                >
+                  <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map((cur: Currency) => (
-                    <SelectItem key={cur.id} value={cur.id}>
-                      {cur.code} ({cur.symbol})
+                  {bankAccounts.map((acc: BankAccount) => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.account_name} ({acc.bank_name})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-
-          {/* Exchange Rate */}
-          <div className="space-y-2">
-            <Label htmlFor="add-expense-rate">Exchange Rate to PKR</Label>
-            <Input
-              id="add-expense-rate"
-              name="exchange_rate_to_pkr"
-              type="number"
-              step="any"
-              value={exchangeRate}
-              onChange={(e) => setExchangeRate(e.target.value)}
-              required
-            />
-          </div>
-
-          {/* Date */}
-          <div className="space-y-2">
-            <Label htmlFor="add-expense-date">Date</Label>
-            <Input
-              id="add-expense-date"
-              name="date"
-              type="date"
-              defaultValue={today}
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="add-expense-desc">Description (optional)</Label>
-            <Textarea
-              id="add-expense-desc"
-              name="description"
-              placeholder="Add a description..."
-              rows={2}
-            />
-          </div>
-
-          {/* Cause */}
-          <div className="space-y-2">
-            <Label>Cause (optional)</Label>
+            ) : (
+              <Select value={fromUserId} onValueChange={setFromUserId}>
+                <SelectTrigger
+                  className={cn(
+                    "text-sm transition-colors",
+                    fromUserId && "border-emerald-500/50 bg-emerald-500/5",
+                  )}
+                >
+                  <SelectValue placeholder="Select volunteer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((profile: Profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={causeId} onValueChange={setCauseId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select cause" />
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Optional" />
               </SelectTrigger>
               <SelectContent>
                 {causes.map((cause: Cause) => (
@@ -386,49 +449,43 @@ function AddExpenseDialog({
             </Select>
           </div>
 
-          {/* Conditional: Bank Account or Paying Volunteer */}
-          {method === "bank" ? (
-            <div className="space-y-2">
-              <Label>Bank Account</Label>
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((acc: BankAccount) => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      {acc.account_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Description - collapsible */}
+          {showDescription ? (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Notes</label>
+              <Textarea
+                name="description"
+                placeholder="Optional notes about this expense"
+                rows={2}
+                className="text-sm"
+                autoFocus
+              />
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label>Paying Volunteer</Label>
-              <Select value={fromUserId} onValueChange={setFromUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles.map((profile: Profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowDescription(true)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              + Add notes
+            </button>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-1">
             <DialogClose asChild>
-              <Button type="button" variant="outline">
+              <Button type="button" variant="outline" size="sm">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Creating..." : "Create"}
+            <Button type="submit" size="sm" disabled={pending || !formReady}>
+              {pending ? (
+                <>
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
             </Button>
           </DialogFooter>
         </form>

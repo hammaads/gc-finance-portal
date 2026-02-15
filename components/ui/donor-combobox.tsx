@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Check, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type Donor = {
   id: string;
@@ -41,6 +43,9 @@ export function DonorAutocomplete({
         d.name.toLowerCase().includes(donorName.toLowerCase()),
       )
     : [];
+
+  const isExisting = !!donorId;
+  const isNew = !donorId && donorName.trim().length > 0;
 
   const handleNameChange = useCallback(
     (value: string) => {
@@ -109,63 +114,91 @@ export function DonorAutocomplete({
   }, []);
 
   return (
-    <div className="grid grid-cols-5 gap-x-2 gap-y-1" ref={containerRef}>
-      <label className="col-span-3 text-xs font-medium text-muted-foreground">
-        Donor Name
-      </label>
-      <label className="col-span-2 text-xs font-medium text-muted-foreground">
-        Phone
-      </label>
-      <div className="relative col-span-3">
-        <Input
-          type="text"
-          value={donorName}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onFocus={() => {
-            if (donorName.trim() && !donorId) setShowSuggestions(true);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="e.g. Ahmed Khan"
-          autoComplete="off"
-          disabled={disabled}
-        />
-        {showSuggestions && filtered.length > 0 && (
-          <ul
-            ref={listRef}
-            className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
-          >
-            {filtered.map((donor, i) => (
-              <li
-                key={donor.id}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(donor);
-                }}
-                onMouseEnter={() => setHighlightIndex(i)}
-                className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm ${
-                  i === highlightIndex ? "bg-accent text-accent-foreground" : ""
-                }`}
-              >
-                <span>{donor.name}</span>
-                {donor.phone && (
-                  <span className="text-xs text-muted-foreground">
-                    {donor.phone}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+    <div className="space-y-1">
+      <div className="grid grid-cols-5 gap-x-2 gap-y-1" ref={containerRef}>
+        <label className="col-span-3 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+          Donor Name <span className="text-destructive">*</span>
+          {isExisting && <Check className="size-3 text-emerald-500" />}
+        </label>
+        <label className="col-span-2 text-xs font-medium text-muted-foreground">
+          Phone
+        </label>
+        <div className="relative col-span-3">
+          <Input
+            type="text"
+            value={donorName}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => {
+              if (donorName.trim() && !donorId) setShowSuggestions(true);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="e.g. Ahmed Khan"
+            autoComplete="off"
+            disabled={disabled}
+            className={cn(
+              "transition-colors",
+              isExisting && "border-emerald-500/50 bg-emerald-500/5",
+              isNew && "border-blue-500/50 bg-blue-500/5",
+            )}
+          />
+          {showSuggestions && filtered.length > 0 && (
+            <ul
+              ref={listRef}
+              className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+            >
+              {filtered.map((donor, i) => (
+                <li
+                  key={donor.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(donor);
+                  }}
+                  onMouseEnter={() => setHighlightIndex(i)}
+                  className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm ${
+                    i === highlightIndex
+                      ? "bg-accent text-accent-foreground"
+                      : ""
+                  }`}
+                >
+                  <span>{donor.name}</span>
+                  {donor.phone && (
+                    <span className="text-xs text-muted-foreground">
+                      {donor.phone}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="col-span-2">
+          <Input
+            type="tel"
+            value={donorPhone}
+            onChange={(e) => onDonorPhoneChange(e.target.value)}
+            placeholder="+92 300 1234567"
+            disabled={disabled}
+            className={cn(
+              "transition-colors",
+              isExisting && "border-emerald-500/50 bg-emerald-500/5",
+              isNew && donorPhone.trim() && "border-blue-500/50 bg-blue-500/5",
+            )}
+          />
+        </div>
       </div>
-      <div className="col-span-2">
-        <Input
-          type="tel"
-          value={donorPhone}
-          onChange={(e) => onDonorPhoneChange(e.target.value)}
-          placeholder="+92 300 1234567"
-          disabled={disabled}
-        />
-      </div>
+      {/* Status indicator */}
+      {isExisting && (
+        <p className="flex items-center gap-1 text-[11px] text-emerald-600">
+          <Check className="size-3" />
+          Existing donor
+        </p>
+      )}
+      {isNew && (
+        <p className="flex items-center gap-1 text-[11px] text-blue-600">
+          <UserPlus className="size-3" />
+          New donor — will be created on save
+        </p>
+      )}
     </div>
   );
 }
