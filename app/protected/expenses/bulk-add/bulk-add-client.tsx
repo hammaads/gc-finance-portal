@@ -65,7 +65,7 @@ type BankAccount = {
     exchange_rate_to_pkr: number;
   } | null;
 };
-type Cause = { id: string; name: string };
+type Cause = { id: string; name: string; type: string };
 type Profile = { id: string; display_name: string };
 
 interface BulkAddClientProps {
@@ -395,11 +395,13 @@ export function BulkAddClient({
               <SelectItem value="__general__">
                 General (Inventory)
               </SelectItem>
-              {causes.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
+              {causes
+                .filter((c) => c.type === "drive")
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>

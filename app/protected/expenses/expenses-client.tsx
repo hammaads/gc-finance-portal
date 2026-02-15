@@ -95,7 +95,7 @@ type BankAccount = {
     exchange_rate_to_pkr: number;
   } | null;
 };
-type Cause = { id: string; name: string };
+type Cause = { id: string; name: string; type: string };
 type Profile = { id: string; display_name: string };
 
 interface ExpensesClientProps {
@@ -641,11 +641,13 @@ export function AddExpenseDialog({
                 <SelectItem value="__general__">
                   General (Inventory)
                 </SelectItem>
-                {causes.map((cause) => (
-                  <SelectItem key={cause.id} value={cause.id}>
-                    {cause.name}
-                  </SelectItem>
-                ))}
+                {causes
+                  .filter((cause) => cause.type === "drive")
+                  .map((cause) => (
+                    <SelectItem key={cause.id} value={cause.id}>
+                      {cause.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
