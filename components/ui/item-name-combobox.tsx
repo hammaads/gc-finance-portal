@@ -1,22 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useState, useRef, useEffect } from "react";
+import { Input } from "@/components/ui/input";
 
 type ItemNameComboboxProps = {
   itemNames: string[];
@@ -31,85 +16,118 @@ export function ItemNameCombobox({
   itemNames,
   value,
   onChange,
-  placeholder = "Search or type item name",
+  placeholder = "Type item name...",
   disabled = false,
   hasError = false,
 }: ItemNameComboboxProps) {
-  const [open, setOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const filtered = value.trim()
+    ? itemNames.filter((name) =>
+        name.toLowerCase().includes(value.toLowerCase()),
+      )
+    : [];
+
+  function handleChange(text: string) {
+    onChange(text);
+    setShowSuggestions(true);
+    setHighlightIndex(-1);
+  }
 
   function handleSelect(name: string) {
     onChange(name);
-    setOpen(false);
-    setSearchText("");
+    setShowSuggestions(false);
+    setHighlightIndex(-1);
   }
 
-  function handleSearchChange(text: string) {
-    setSearchText(text);
-    // Live update the value as user types (free-text field)
-    onChange(text);
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showSuggestions || filtered.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev < filtered.length - 1 ? prev + 1 : 0,
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev > 0 ? prev - 1 : filtered.length - 1,
+      );
+    } else if (e.key === "Enter" && highlightIndex >= 0) {
+      e.preventDefault();
+      handleSelect(filtered[highlightIndex]);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
   }
+
+  useEffect(() => {
+    if (
+      highlightIndex >= 0 &&
+      listRef.current &&
+      listRef.current.children[highlightIndex]
+    ) {
+      (listRef.current.children[highlightIndex] as HTMLElement).scrollIntoView({
+        block: "nearest",
+      });
+    }
+  }, [highlightIndex]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-invalid={hasError}
-          disabled={disabled}
-          className={cn(
-            "w-full justify-between font-normal",
-            !value && "text-muted-foreground",
-          )}
+    <div ref={containerRef} className="relative">
+      <Input
+        type="text"
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => {
+          if (value.trim()) setShowSuggestions(true);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        autoComplete="off"
+        disabled={disabled}
+        aria-invalid={hasError}
+      />
+      {showSuggestions && filtered.length > 0 && (
+        <ul
+          ref={listRef}
+          className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
         >
-          {value || placeholder}
-          <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        align="start"
-      >
-        <Command shouldFilter={false} className="rounded-lg border-0 shadow-none">
-          <CommandInput
-            placeholder="Type item name..."
-            value={searchText || value}
-            onValueChange={handleSearchChange}
-          />
-          <CommandList>
-            {(() => {
-              const query = (searchText || value || "").toLowerCase();
-              const filtered = itemNames.filter(
-                (name) => !query || name.toLowerCase().includes(query),
-              );
-              return (
-                <>
-                  <CommandGroup>
-                    {filtered.map((name) => (
-                      <CommandItem
-                        key={name}
-                        value={name}
-                        onSelect={() => handleSelect(name)}
-                      >
-                        {name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                  {filtered.length === 0 && (
-                    <CommandEmpty>
-                      <p className="py-2 text-center text-sm text-muted-foreground">
-                        New item — press Enter or click outside
-                      </p>
-                    </CommandEmpty>
-                  )}
-                </>
-              );
-            })()}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+          {filtered.map((name, i) => (
+            <li
+              key={name}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(name);
+              }}
+              onMouseEnter={() => setHighlightIndex(i)}
+              className={`cursor-pointer rounded-sm px-2 py-1.5 text-sm ${
+                i === highlightIndex
+                  ? "bg-accent text-accent-foreground"
+                  : ""
+              }`}
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
