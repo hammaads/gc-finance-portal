@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 type Donor = {
   id: string;
@@ -110,11 +109,15 @@ export function DonorAutocomplete({
   }, []);
 
   return (
-    <div className="space-y-3">
-      <div className="relative" ref={containerRef}>
-        <Label htmlFor="donor-name">Donor Name</Label>
+    <div className="grid grid-cols-5 gap-x-2 gap-y-1" ref={containerRef}>
+      <label className="col-span-3 text-xs font-medium text-muted-foreground">
+        Donor Name
+      </label>
+      <label className="col-span-2 text-xs font-medium text-muted-foreground">
+        Phone
+      </label>
+      <div className="relative col-span-3">
         <Input
-          id="donor-name"
           type="text"
           value={donorName}
           onChange={(e) => handleNameChange(e.target.value)}
@@ -122,15 +125,14 @@ export function DonorAutocomplete({
             if (donorName.trim() && !donorId) setShowSuggestions(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Type donor name"
+          placeholder="e.g. Ahmed Khan"
           autoComplete="off"
           disabled={disabled}
-          className="mt-1"
         />
         {showSuggestions && filtered.length > 0 && (
           <ul
             ref={listRef}
-            className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
+            className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
           >
             {filtered.map((donor, i) => (
               <li
@@ -140,7 +142,7 @@ export function DonorAutocomplete({
                   handleSelect(donor);
                 }}
                 onMouseEnter={() => setHighlightIndex(i)}
-                className={`flex cursor-pointer flex-col rounded-sm px-2 py-1.5 text-sm ${
+                className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 text-sm ${
                   i === highlightIndex ? "bg-accent text-accent-foreground" : ""
                 }`}
               >
@@ -155,17 +157,13 @@ export function DonorAutocomplete({
           </ul>
         )}
       </div>
-
-      <div>
-        <Label htmlFor="donor-phone">Phone Number</Label>
+      <div className="col-span-2">
         <Input
-          id="donor-phone"
           type="tel"
           value={donorPhone}
           onChange={(e) => onDonorPhoneChange(e.target.value)}
           placeholder="+92 300 1234567"
           disabled={disabled}
-          className="mt-1"
         />
       </div>
     </div>

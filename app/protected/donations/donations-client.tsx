@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
@@ -197,6 +196,7 @@ function AddDonationDialog({
   );
   const [toUserId, setToUserId] = useState("");
   const [date, setDate] = useState<Date>(new Date());
+  const [showDescription, setShowDescription] = useState(false);
 
   const baseCurrency = currencies.find((c) => c.is_base) ?? currencies[0];
   const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
@@ -224,6 +224,7 @@ function AddDonationDialog({
     setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setToUserId("");
     setDate(new Date());
+    setShowDescription(false);
   }
 
   function getErrorMessage(result: { error?: Record<string, string[] | undefined> }): string {
@@ -273,31 +274,58 @@ function AddDonationDialog({
           Add Donation
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add Donation</DialogTitle>
+      <DialogContent className="max-w-sm gap-0 p-5">
+        <DialogHeader className="mb-3 space-y-0">
+          <DialogTitle className="text-base">Add Donation</DialogTitle>
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-3">
           <input type="hidden" name="type" value={method} />
-
-          {/* Method Toggle */}
-          <div className="space-y-2">
-            <Label>Method</Label>
-            <Select value={method} onValueChange={handleMethodChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="donation_bank">Bank Transfer</SelectItem>
-                <SelectItem value="donation_cash">Cash</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Donor */}
+          <input type="hidden" name="currency_id" value={activeCurrency.id} />
+          <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
+          <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
           <input type="hidden" name="donor_id" value={donorId} />
           <input type="hidden" name="donor_name" value={donorName} />
           <input type="hidden" name="donor_phone" value={donorPhone} />
+          <input type="hidden" name="cause_id" value={causeId} />
+          {method === "donation_bank" && (
+            <input type="hidden" name="bank_account_id" value={bankAccountId} />
+          )}
+          {method === "donation_cash" && (
+            <input type="hidden" name="to_user_id" value={toUserId} />
+          )}
+
+          {/* Method toggle */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Method</label>
+            <div className="flex rounded-md border p-0.5">
+              <button
+                type="button"
+                onClick={() => handleMethodChange("donation_bank")}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+                  method === "donation_bank"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Bank
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMethodChange("donation_cash")}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+                  method === "donation_cash"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Cash
+              </button>
+            </div>
+          </div>
+
+          {/* Donor name + phone */}
           <DonorAutocomplete
             donors={donors}
             donorId={donorId}
@@ -308,13 +336,15 @@ function AddDonationDialog({
             onDonorPhoneChange={setDonorPhone}
           />
 
-          {/* Amount */}
-          <input type="hidden" name="currency_id" value={activeCurrency.id} />
-          <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
-          <div className="space-y-2">
-            <Label htmlFor="add-donation-amount">Amount ({activeCurrency.code})</Label>
+          {/* Amount + Date */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <label className="text-xs font-medium text-muted-foreground">
+              Amount ({activeCurrency.code})
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">
+              Date
+            </label>
             <Input
-              id="add-donation-amount"
               name="amount"
               type="number"
               step="any"
@@ -322,23 +352,15 @@ function AddDonationDialog({
               placeholder="0.00"
               required
             />
-          </div>
-
-          {/* Date */}
-          <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
-          <div className="space-y-2">
-            <Label>Date</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground",
-                  )}
+                  className="w-full justify-start text-left text-sm font-normal"
                 >
-                  <CalendarIcon className="mr-2 size-4" />
-                  {format(date, "EEE, dd MMM yyyy")}
+                  <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
+                  <span className="truncate">{format(date, "dd MMM yyyy")}</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -353,25 +375,43 @@ function AddDonationDialog({
             </Popover>
           </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="add-donation-description">
-              Description (optional)
-            </Label>
-            <Textarea
-              id="add-donation-description"
-              name="description"
-              placeholder="Notes about this donation"
-              rows={2}
-            />
-          </div>
-
-          {/* Cause */}
-          <div className="space-y-2">
-            <Label>Cause (optional)</Label>
-            <input type="hidden" name="cause_id" value={causeId} />
+          {/* Destination + Cause */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <label className="text-xs font-medium text-muted-foreground">
+              {method === "donation_bank" ? "Bank Account" : "Receiving Volunteer"}
+            </label>
+            <label className="text-xs font-medium text-muted-foreground">
+              Cause
+            </label>
+            {method === "donation_bank" ? (
+              <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {bankAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.account_name} ({account.bank_name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select value={toUserId} onValueChange={setToUserId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Select volunteer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {profiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={causeId} onValueChange={setCauseId}>
-              <SelectTrigger>
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Select cause" />
               </SelectTrigger>
               <SelectContent>
@@ -384,58 +424,36 @@ function AddDonationDialog({
             </Select>
           </div>
 
-          {/* Bank Account (if bank method) */}
-          {method === "donation_bank" && (
-            <div className="space-y-2">
-              <Label>Bank Account</Label>
-              <input
-                type="hidden"
-                name="bank_account_id"
-                value={bankAccountId}
+          {/* Description - collapsible */}
+          {showDescription ? (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Notes</label>
+              <Textarea
+                name="description"
+                placeholder="Optional notes about this donation"
+                rows={2}
+                className="text-sm"
+                autoFocus
               />
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select bank account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_name} ({account.bank_name})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDescription(true)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              + Add notes
+            </button>
           )}
 
-          {/* Receiving Volunteer (if cash method) */}
-          {method === "donation_cash" && (
-            <div className="space-y-2">
-              <Label>Receiving Volunteer</Label>
-              <input type="hidden" name="to_user_id" value={toUserId} />
-              <Select value={toUserId} onValueChange={setToUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-1">
             <DialogClose asChild>
-              <Button type="button" variant="outline">
+              <Button type="button" variant="outline" size="sm">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Creating..." : "Create"}
+            <Button type="submit" size="sm" disabled={pending}>
+              {pending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </form>
