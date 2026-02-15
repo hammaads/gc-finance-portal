@@ -24,7 +24,7 @@ export async function getItemNameSuggestions() {
   const { data, error } = await supabase
     .from("ledger_entries")
     .select("item_name")
-    .in("type", ["expense_bank", "expense_cash"])
+    .in("type", ["expense_bank", "expense_cash", "donation_in_kind"])
     .is("deleted_at", null)
     .is("cause_id", null)
     .not("item_name", "is", null)

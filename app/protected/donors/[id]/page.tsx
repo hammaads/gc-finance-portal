@@ -70,17 +70,21 @@ async function DonorDetail({ id }: { id: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(
-                        donation.amount,
-                        donation.currencies?.symbol,
-                      )}
+                      {donation.type === "donation_in_kind"
+                        ? `${donation.item_name} ×${donation.quantity}`
+                        : formatCurrency(
+                            donation.amount,
+                            donation.currencies?.symbol,
+                          )}
                     </TableCell>
-                    <TableCell>{donation.currencies?.code ?? "-"}</TableCell>
+                    <TableCell>{donation.type === "donation_in_kind" ? "-" : donation.currencies?.code ?? "-"}</TableCell>
                     <TableCell>{donation.causes?.name ?? "-"}</TableCell>
                     <TableCell>
-                      {donation.bank_accounts?.account_name ??
-                        donation.to_user?.name ??
-                        "-"}
+                      {donation.type === "donation_in_kind"
+                        ? donation.custodian?.name ?? "-"
+                        : donation.bank_accounts?.account_name ??
+                          donation.to_user?.name ??
+                          "-"}
                     </TableCell>
                   </TableRow>
                 ))

@@ -51,9 +51,21 @@ export const cashDepositSchema = baseLedgerSchema.extend({
   bank_account_id: z.string().uuid("Select a bank account"),
 });
 
+export const donationInKindSchema = z.object({
+  type: z.literal("donation_in_kind"),
+  date: z.string().min(1, "Date is required"),
+  donor_id: z.string().uuid("Select a donor"),
+  item_name: z.string().min(1, "Item name is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  custodian_id: z.string().uuid("Select a custodian"),
+  description: z.string().optional().nullable(),
+  cause_id: z.string().uuid().optional().nullable(),
+});
+
 export const donationSchema = z.discriminatedUnion("type", [
   donationBankSchema,
   donationCashSchema,
+  donationInKindSchema,
 ]);
 
 export const expenseSchema = z.discriminatedUnion("type", [

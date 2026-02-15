@@ -158,6 +158,7 @@ export function DashboardContent({
             bankAccounts={bankAccounts}
             causes={causes}
             volunteers={volunteers}
+            itemNames={itemNames}
           />
           <AddExpenseDialog
             categories={expenseCategories}

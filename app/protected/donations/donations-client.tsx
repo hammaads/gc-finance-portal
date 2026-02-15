@@ -59,11 +59,14 @@ type Donation = {
   cause_id: string | null;
   bank_account_id: string | null;
   to_user_id: string | null;
+  item_name: string | null;
+  quantity: number | null;
   currencies: { code: string; symbol: string } | null;
   donors: { name: string } | null;
   causes: { name: string } | null;
   bank_accounts: { account_name: string } | null;
   to_user: { name: string } | null;
+  custodian: { name: string } | null;
 };
 
 type Donor = {
@@ -108,6 +111,7 @@ interface DonationsClientProps {
   bankAccounts: BankAccount[];
   causes: Cause[];
   volunteers: Volunteer[];
+  itemNames: string[];
 }
 
 // ── Delete Donation Dialog ──
@@ -176,16 +180,18 @@ export function AddDonationDialog({
   bankAccounts,
   causes,
   volunteers,
+  itemNames,
 }: {
   donors: Donor[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
   causes: Cause[];
   volunteers: Volunteer[];
+  itemNames: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [method, setMethod] = useState<"donation_bank" | "donation_cash">(
+  const [method, setMethod] = useState<"donation_bank" | "donation_cash" | "donation_in_kind">(
     "donation_bank",
   );
   const [donorId, setDonorId] = useState("");
@@ -199,6 +205,11 @@ export function AddDonationDialog({
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [showDescription, setShowDescription] = useState(false);
+  // In-kind specific state
+  const [itemName, setItemName] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [custodianId, setCustodianId] = useState("");
+  const [itemSuggestions, setItemSuggestions] = useState(false);
 
   const baseCurrency = currencies.find((c) => c.is_base) ?? currencies[0];
   const selectedBank = bankAccounts.find((b) => b.id === bankAccountId);
@@ -217,6 +228,10 @@ export function AddDonationDialog({
           exchange_rate: baseCurrency?.exchange_rate_to_pkr ?? 1,
         };
 
+  const filteredItemNames = itemName.trim()
+    ? itemNames.filter((n) => n.toLowerCase().includes(itemName.toLowerCase()))
+    : [];
+
   function resetForm() {
     setMethod("donation_bank");
     setDonorId("");
@@ -228,6 +243,10 @@ export function AddDonationDialog({
     setToUserId("");
     setDate(new Date());
     setShowDescription(false);
+    setItemName("");
+    setQuantity("1");
+    setCustodianId("");
+    setItemSuggestions(false);
   }
 
   function getErrorMessage(result: { error?: Record<string, string[] | undefined> }): string {
@@ -254,11 +273,12 @@ export function AddDonationDialog({
 
   const formReady =
     donorName.trim().length > 0 &&
-    Number(amount) > 0 &&
-    (method === "donation_bank" ? !!bankAccountId : !!toUserId);
+    (method === "donation_in_kind"
+      ? itemName.trim().length > 0 && Number(quantity) > 0 && !!custodianId
+      : Number(amount) > 0 &&
+        (method === "donation_bank" ? !!bankAccountId : !!toUserId));
 
-  function handleMethodChange(value: string) {
-    const newMethod = value as "donation_bank" | "donation_cash";
+  function handleMethodChange(newMethod: "donation_bank" | "donation_cash" | "donation_in_kind") {
     setMethod(newMethod);
     setBankAccountId(
       newMethod === "donation_bank" && bankAccounts.length > 0
@@ -266,6 +286,9 @@ export function AddDonationDialog({
         : "",
     );
     setToUserId("");
+    setItemName("");
+    setQuantity("1");
+    setCustodianId("");
   }
 
   return (
@@ -288,18 +311,28 @@ export function AddDonationDialog({
         </DialogHeader>
         <form action={formAction} className="space-y-3">
           <input type="hidden" name="type" value={method} />
-          <input type="hidden" name="currency_id" value={activeCurrency.id} />
-          <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
           <input type="hidden" name="date" value={format(date, "yyyy-MM-dd")} />
           <input type="hidden" name="donor_id" value={donorId} />
           <input type="hidden" name="donor_name" value={donorName} />
           <input type="hidden" name="donor_phone" value={donorPhone} />
           <input type="hidden" name="cause_id" value={causeId} />
-          {method === "donation_bank" && (
-            <input type="hidden" name="bank_account_id" value={bankAccountId} />
-          )}
-          {method === "donation_cash" && (
-            <input type="hidden" name="to_user_id" value={toUserId} />
+          {method === "donation_in_kind" ? (
+            <>
+              <input type="hidden" name="item_name" value={itemName} />
+              <input type="hidden" name="quantity" value={quantity} />
+              <input type="hidden" name="custodian_id" value={custodianId} />
+            </>
+          ) : (
+            <>
+              <input type="hidden" name="currency_id" value={activeCurrency.id} />
+              <input type="hidden" name="exchange_rate_to_pkr" value={String(activeCurrency.exchange_rate)} />
+              {method === "donation_bank" && (
+                <input type="hidden" name="bank_account_id" value={bankAccountId} />
+              )}
+              {method === "donation_cash" && (
+                <input type="hidden" name="to_user_id" value={toUserId} />
+              )}
+            </>
           )}
 
           {/* Method toggle */}
@@ -308,30 +341,21 @@ export function AddDonationDialog({
               Method <span className="text-destructive">*</span>
             </label>
             <div className="flex rounded-md border p-0.5">
-              <button
-                type="button"
-                onClick={() => handleMethodChange("donation_bank")}
-                className={cn(
-                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
-                  method === "donation_bank"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Bank
-              </button>
-              <button
-                type="button"
-                onClick={() => handleMethodChange("donation_cash")}
-                className={cn(
-                  "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
-                  method === "donation_cash"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Cash
-              </button>
+              {(["donation_bank", "donation_cash", "donation_in_kind"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleMethodChange(m)}
+                  className={cn(
+                    "flex-1 rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+                    method === m
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {m === "donation_bank" ? "Bank" : m === "donation_cash" ? "Cash" : "In Kind"}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -346,101 +370,217 @@ export function AddDonationDialog({
             onDonorPhoneChange={setDonorPhone}
           />
 
-          {/* Amount + Date */}
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              Amount ({activeCurrency.code}) <span className="text-destructive">*</span>
-              {Number(amount) > 0 && <Check className="size-3 text-emerald-500" />}
-            </label>
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              Date <span className="text-destructive">*</span>
-            </label>
-            <Input
-              name="amount"
-              type="number"
-              step="any"
-              min="0"
-              placeholder="0.00"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className={cn(
-                "transition-colors",
-                Number(amount) > 0 && "border-emerald-500/50 bg-emerald-500/5",
-              )}
-            />
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full justify-start border-emerald-500/50 bg-emerald-500/5 text-left text-sm font-normal transition-colors"
-                >
-                  <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
-                  <span className="truncate">{format(date, "dd MMM yyyy")}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  disabled={{ after: new Date() }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Destination + Cause */}
-          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              {method === "donation_bank" ? "Bank Account" : "Receiving Volunteer"} <span className="text-destructive">*</span>
-              {(method === "donation_bank" ? bankAccountId : toUserId) && (
-                <Check className="size-3 text-emerald-500" />
-              )}
-            </label>
-            <label className="text-xs font-medium text-muted-foreground">
-              Cause
-            </label>
-            {method === "donation_bank" ? (
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger
+          {method === "donation_in_kind" ? (
+            <>
+              {/* Item Name + Quantity */}
+              <div className="grid grid-cols-[1fr_80px] gap-x-2 gap-y-1">
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Item Name <span className="text-destructive">*</span>
+                  {itemName.trim() && <Check className="size-3 text-emerald-500" />}
+                </label>
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Qty <span className="text-destructive">*</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    placeholder="e.g. Rice Bags"
+                    value={itemName}
+                    onChange={(e) => {
+                      setItemName(e.target.value);
+                      setItemSuggestions(true);
+                    }}
+                    onFocus={() => setItemSuggestions(true)}
+                    onBlur={() => setTimeout(() => setItemSuggestions(false), 150)}
+                    className={cn(
+                      "text-sm transition-colors",
+                      itemName.trim() && "border-emerald-500/50 bg-emerald-500/5",
+                    )}
+                  />
+                  {itemSuggestions && filteredItemNames.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+                      {filteredItemNames.slice(0, 5).map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                          onMouseDown={() => {
+                            setItemName(name);
+                            setItemSuggestions(false);
+                          }}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
                   className={cn(
                     "text-sm transition-colors",
-                    bankAccountId && "border-emerald-500/50 bg-emerald-500/5",
+                    Number(quantity) > 0 && "border-emerald-500/50 bg-emerald-500/5",
                   )}
-                >
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bankAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_name} ({account.bank_name})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <VolunteerCombobox
-                volunteers={volunteers}
-                value={toUserId}
-                onChange={setToUserId}
-              />
-            )}
-            <Select value={causeId} onValueChange={setCauseId}>
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Optional" />
-              </SelectTrigger>
-              <SelectContent>
-                {causes.filter((c) => c.type !== "drive").map((cause) => (
-                  <SelectItem key={cause.id} value={cause.id}>
-                    {cause.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                />
+              </div>
+
+              {/* Date + Custodian */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Date <span className="text-destructive">*</span>
+                </label>
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Received By <span className="text-destructive">*</span>
+                  {custodianId && <Check className="size-3 text-emerald-500" />}
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start border-emerald-500/50 bg-emerald-500/5 text-left text-sm font-normal transition-colors"
+                    >
+                      <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
+                      <span className="truncate">{format(date, "dd MMM yyyy")}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={(d) => d && setDate(d)}
+                      disabled={{ after: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <VolunteerCombobox
+                  volunteers={volunteers}
+                  value={custodianId}
+                  onChange={setCustodianId}
+                  placeholder="Who received items..."
+                />
+              </div>
+
+              {/* Cause */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Cause</label>
+                <Select value={causeId} onValueChange={setCauseId}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {causes.filter((c) => c.type !== "drive").map((cause) => (
+                      <SelectItem key={cause.id} value={cause.id}>
+                        {cause.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Amount + Date */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Amount ({activeCurrency.code}) <span className="text-destructive">*</span>
+                  {Number(amount) > 0 && <Check className="size-3 text-emerald-500" />}
+                </label>
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  Date <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  name="amount"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className={cn(
+                    "transition-colors",
+                    Number(amount) > 0 && "border-emerald-500/50 bg-emerald-500/5",
+                  )}
+                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start border-emerald-500/50 bg-emerald-500/5 text-left text-sm font-normal transition-colors"
+                    >
+                      <CalendarIcon className="mr-1.5 size-3.5 shrink-0 opacity-60" />
+                      <span className="truncate">{format(date, "dd MMM yyyy")}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={(d) => d && setDate(d)}
+                      disabled={{ after: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Destination + Cause */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  {method === "donation_bank" ? "Bank Account" : "Receiving Volunteer"} <span className="text-destructive">*</span>
+                  {(method === "donation_bank" ? bankAccountId : toUserId) && (
+                    <Check className="size-3 text-emerald-500" />
+                  )}
+                </label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Cause
+                </label>
+                {method === "donation_bank" ? (
+                  <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                    <SelectTrigger
+                      className={cn(
+                        "text-sm transition-colors",
+                        bankAccountId && "border-emerald-500/50 bg-emerald-500/5",
+                      )}
+                    >
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.account_name} ({account.bank_name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <VolunteerCombobox
+                    volunteers={volunteers}
+                    value={toUserId}
+                    onChange={setToUserId}
+                  />
+                )}
+                <Select value={causeId} onValueChange={setCauseId}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {causes.filter((c) => c.type !== "drive").map((cause) => (
+                      <SelectItem key={cause.id} value={cause.id}>
+                        {cause.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
 
           {/* Description - collapsible */}
           {showDescription ? (
@@ -496,6 +636,7 @@ export function DonationsClient({
   bankAccounts,
   causes,
   volunteers,
+  itemNames,
 }: DonationsClientProps) {
   return (
     <div className="space-y-4">
@@ -507,6 +648,7 @@ export function DonationsClient({
           bankAccounts={bankAccounts}
           causes={causes}
           volunteers={volunteers}
+          itemNames={itemNames}
         />
       </div>
       <Table>
@@ -535,11 +677,13 @@ export function DonationsClient({
             </TableRow>
           ) : (
             donations.map((donation) => {
+              const isInKind = donation.type === "donation_in_kind";
               const pkrValue = donation.amount * donation.exchange_rate_to_pkr;
               const methodLabel =
-                donation.type === "donation_bank" ? "Bank" : "Cash";
-              const recipient =
-                donation.type === "donation_bank"
+                donation.type === "donation_bank" ? "Bank" : donation.type === "donation_cash" ? "Cash" : "In-Kind";
+              const recipient = isInKind
+                ? donation.custodian?.name ?? "-"
+                : donation.type === "donation_bank"
                   ? donation.bank_accounts?.account_name ?? "-"
                   : donation.to_user?.name ?? "-";
 
@@ -548,14 +692,13 @@ export function DonationsClient({
                   <TableCell>{formatDate(donation.date)}</TableCell>
                   <TableCell>{donation.donors?.name ?? "-"}</TableCell>
                   <TableCell className="text-right">
-                    {formatCurrency(
-                      donation.amount,
-                      donation.currencies?.symbol,
-                    )}
+                    {isInKind
+                      ? `${donation.item_name} ×${donation.quantity}`
+                      : formatCurrency(donation.amount, donation.currencies?.symbol)}
                   </TableCell>
-                  <TableCell>{donation.currencies?.code ?? "-"}</TableCell>
+                  <TableCell>{isInKind ? "-" : donation.currencies?.code ?? "-"}</TableCell>
                   <TableCell className="text-right">
-                    {formatCurrency(pkrValue, "Rs")}
+                    {isInKind ? "-" : formatCurrency(pkrValue, "Rs")}
                   </TableCell>
                   <TableCell>
                     <Badge

@@ -30,7 +30,7 @@ export async function getDonorDonations(donorId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ledger_entries")
-    .select("*, currencies(code, symbol), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name)")
+    .select("*, currencies(code, symbol), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name), custodian:volunteers!ledger_entries_custodian_id_fkey(name)")
     .eq("donor_id", donorId)
     .is("deleted_at", null)
     .order("date", { ascending: false });
