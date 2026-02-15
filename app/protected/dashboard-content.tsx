@@ -106,6 +106,8 @@ interface DashboardContentProps {
   causes: Cause[];
   profiles: Profile[];
   expenseCategories: ExpenseCategory[];
+  itemNames: string[];
+  receiptRequired: boolean;
 }
 
 export function DashboardContent({
@@ -119,6 +121,8 @@ export function DashboardContent({
   causes,
   profiles,
   expenseCategories,
+  itemNames,
+  receiptRequired,
 }: DashboardContentProps) {
   const totalBankFunds = bankBalances.reduce(
     (sum: number, b: BankBalance) => sum + (b.balance ?? 0) * (b.currency_code === "PKR" ? 1 : 1),
@@ -161,6 +165,8 @@ export function DashboardContent({
             bankAccounts={bankAccounts}
             causes={causes}
             profiles={profiles}
+            itemNames={itemNames}
+            receiptRequired={receiptRequired}
           />
         </div>
       </div>

@@ -39,7 +39,9 @@ import {
   updateDriveTemplate,
   deleteDriveTemplate,
 } from "@/lib/actions/budget";
+import { updateReceiptSetting } from "@/lib/actions/receipts";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -79,6 +81,7 @@ interface SettingsClientProps {
   categories: Category[];
   currencies: Currency[];
   templates: Template[];
+  receiptRequired: boolean;
 }
 
 // ── Add Category Dialog ──
@@ -1451,14 +1454,63 @@ export function SettingsClient({
   categories,
   currencies,
   templates,
+  receiptRequired,
 }: SettingsClientProps) {
+  const router = useRouter();
+  const [receiptReq, setReceiptReq] = useState(receiptRequired);
+  const [receiptSaving, setReceiptSaving] = useState(false);
+
+  async function handleReceiptToggle(checked: boolean) {
+    setReceiptReq(checked);
+    setReceiptSaving(true);
+    const result = await updateReceiptSetting(checked);
+    if ("error" in result) {
+      toast.error("Failed to update setting");
+      setReceiptReq(!checked); // revert
+    } else {
+      toast.success(
+        checked
+          ? "Receipt images are now required"
+          : "Receipt images are now optional",
+      );
+      router.refresh();
+    }
+    setReceiptSaving(false);
+  }
+
   return (
-    <Tabs defaultValue="categories">
+    <Tabs defaultValue="general">
       <TabsList>
+        <TabsTrigger value="general">General</TabsTrigger>
         <TabsTrigger value="categories">Categories</TabsTrigger>
         <TabsTrigger value="currencies">Currencies</TabsTrigger>
         <TabsTrigger value="templates">Templates</TabsTrigger>
       </TabsList>
+
+      {/* ── General Tab ── */}
+      <TabsContent value="general" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">General Settings</h2>
+        </div>
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">
+                Require receipt images
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                When enabled, receipt images must be uploaded for every
+                expense
+              </p>
+            </div>
+            <Switch
+              checked={receiptReq}
+              onCheckedChange={handleReceiptToggle}
+              disabled={receiptSaving}
+            />
+          </div>
+        </Card>
+      </TabsContent>
 
       {/* ── Categories Tab ── */}
       <TabsContent value="categories" className="space-y-4">

@@ -2,20 +2,24 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getExpenseCategories, getCurrencies } from "@/lib/actions/settings";
 import { getDriveTemplates } from "@/lib/actions/budget";
+import { getReceiptSetting } from "@/lib/actions/receipts";
 import { SettingsClient } from "./settings-client";
 
 async function SettingsContent() {
-  const [categories, currencies, templates] = await Promise.all([
-    getExpenseCategories(),
-    getCurrencies(),
-    getDriveTemplates(),
-  ]);
+  const [categories, currencies, templates, receiptRequired] =
+    await Promise.all([
+      getExpenseCategories(),
+      getCurrencies(),
+      getDriveTemplates(),
+      getReceiptSetting(),
+    ]);
 
   return (
     <SettingsClient
       categories={categories}
       currencies={currencies}
       templates={templates}
+      receiptRequired={receiptRequired}
     />
   );
 }

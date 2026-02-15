@@ -7,6 +7,8 @@ import { getDonors } from "@/lib/actions/donors";
 import { getCurrencies, getExpenseCategories } from "@/lib/actions/settings";
 import { getCauses } from "@/lib/actions/causes";
 import { getProfiles } from "@/lib/actions/cash";
+import { getItemNameSuggestions } from "@/lib/actions/expenses";
+import { getReceiptSetting } from "@/lib/actions/receipts";
 import { DashboardContent } from "./dashboard-content";
 
 async function DashboardData() {
@@ -25,6 +27,8 @@ async function DashboardData() {
     causes,
     profiles,
     expenseCategories,
+    itemNames,
+    receiptRequired,
   ] = await Promise.all([
     getBankAccountBalances(),
     supabase.from("volunteer_cash_balances").select("*"),
@@ -41,6 +45,8 @@ async function DashboardData() {
     getCauses(),
     getProfiles(),
     getExpenseCategories(),
+    getItemNameSuggestions(),
+    getReceiptSetting(),
   ]);
 
   return (
@@ -55,6 +61,8 @@ async function DashboardData() {
       causes={causes}
       profiles={profiles}
       expenseCategories={expenseCategories}
+      itemNames={itemNames}
+      receiptRequired={receiptRequired}
     />
   );
 }
