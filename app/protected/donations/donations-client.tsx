@@ -35,6 +35,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { createDonation, deleteDonation } from "@/lib/actions/donations";
+import { DonorCombobox } from "@/components/ui/donor-combobox";
 
 // ── Types ──
 
@@ -92,12 +93,12 @@ type Profile = {
 };
 
 interface DonationsClientProps {
-  donations: any[];
-  donors: any[];
-  currencies: any[];
-  bankAccounts: any[];
-  causes: any[];
-  profiles: any[];
+  donations: Donation[];
+  donors: Donor[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  profiles: Profile[];
 }
 
 // ── Delete Donation Dialog ──
@@ -195,6 +196,12 @@ function AddDonationDialog({
     setToUserId("");
   }
 
+  function getErrorMessage(result: { error?: Record<string, string[] | undefined> }): string {
+    if (!result.error) return "Failed to create donation";
+    const first = Object.values(result.error).flat().find(Boolean);
+    return typeof first === "string" ? first : "Failed to create donation";
+  }
+
   const [, formAction, pending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
       const result = await createDonation(formData);
@@ -204,7 +211,7 @@ function AddDonationDialog({
         resetForm();
         router.refresh();
       } else {
-        toast.error("Failed to create donation");
+        toast.error(getErrorMessage(result));
       }
       return result;
     },
@@ -265,18 +272,12 @@ function AddDonationDialog({
           <div className="space-y-2">
             <Label>Donor</Label>
             <input type="hidden" name="donor_id" value={donorId} />
-            <Select value={donorId} onValueChange={setDonorId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select donor" />
-              </SelectTrigger>
-              <SelectContent>
-                {donors.map((donor) => (
-                  <SelectItem key={donor.id} value={donor.id}>
-                    {donor.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <DonorCombobox
+              donors={donors}
+              value={donorId}
+              onChange={setDonorId}
+              placeholder="Search or select donor"
+            />
           </div>
 
           {/* Amount & Currency */}
@@ -442,23 +443,16 @@ export function DonationsClient({
   causes,
   profiles,
 }: DonationsClientProps) {
-  const typedDonations = donations as Donation[];
-  const typedDonors = donors as Donor[];
-  const typedCurrencies = currencies as Currency[];
-  const typedBankAccounts = bankAccounts as BankAccount[];
-  const typedCauses = causes as Cause[];
-  const typedProfiles = profiles as Profile[];
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">All Donations</h2>
         <AddDonationDialog
-          donors={typedDonors}
-          currencies={typedCurrencies}
-          bankAccounts={typedBankAccounts}
-          causes={typedCauses}
-          profiles={typedProfiles}
+          donors={donors}
+          currencies={currencies}
+          bankAccounts={bankAccounts}
+          causes={causes}
+          profiles={profiles}
         />
       </div>
       <Table>
@@ -476,7 +470,7 @@ export function DonationsClient({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {typedDonations.length === 0 ? (
+          {donations.length === 0 ? (
             <TableRow>
               <TableCell
                 colSpan={9}
@@ -486,7 +480,7 @@ export function DonationsClient({
               </TableCell>
             </TableRow>
           ) : (
-            typedDonations.map((donation) => {
+            donations.map((donation) => {
               const pkrValue = donation.amount * donation.exchange_rate_to_pkr;
               const methodLabel =
                 donation.type === "donation_bank" ? "Bank" : "Cash";

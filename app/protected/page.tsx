@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getBankAccountBalances } from "@/lib/actions/bank-accounts";
 import { DashboardContent } from "./dashboard-content";
 
 async function DashboardData() {
@@ -10,12 +11,12 @@ async function DashboardData() {
   if (error || !claims?.claims) redirect("/auth/login");
 
   const [
-    { data: bankBalances },
+    bankBalances,
     { data: cashBalances },
     { data: driveSummaries },
     { data: recentEntries },
   ] = await Promise.all([
-    supabase.from("bank_account_balances").select("*"),
+    getBankAccountBalances(),
     supabase.from("volunteer_cash_balances").select("*"),
     supabase.from("drive_financial_summary").select("*").eq("type", "drive").order("date"),
     supabase
@@ -28,7 +29,7 @@ async function DashboardData() {
 
   return (
     <DashboardContent
-      bankBalances={bankBalances ?? []}
+      bankBalances={bankBalances}
       cashBalances={cashBalances ?? []}
       driveSummaries={driveSummaries ?? []}
       recentEntries={recentEntries ?? []}

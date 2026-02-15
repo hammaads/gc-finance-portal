@@ -17,6 +17,12 @@ export async function getDonations() {
   return data;
 }
 
+function emptyToNull(value: FormDataEntryValue | null): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s === "" ? null : s;
+}
+
 export async function createDonation(formData: FormData) {
   const type = formData.get("type") as string;
 
@@ -26,9 +32,9 @@ export async function createDonation(formData: FormData) {
     currency_id: formData.get("currency_id"),
     exchange_rate_to_pkr: formData.get("exchange_rate_to_pkr"),
     date: formData.get("date"),
-    description: formData.get("description") || null,
+    description: emptyToNull(formData.get("description")),
     donor_id: formData.get("donor_id"),
-    cause_id: formData.get("cause_id") || null,
+    cause_id: emptyToNull(formData.get("cause_id")),
   };
 
   if (type === "donation_bank") {

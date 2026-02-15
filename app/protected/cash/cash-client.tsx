@@ -2,6 +2,7 @@
 
 import { useActionState, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -30,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRightLeft, Landmark, Plus } from "lucide-react";
+import { ArrowRightLeft, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { createCashTransfer, createCashDeposit } from "@/lib/actions/cash";
@@ -561,7 +562,16 @@ export function CashClient({
               activeBalances.map((b) => (
                 <TableRow key={b.id ?? b.display_name}>
                   <TableCell className="font-medium">
-                    {b.display_name ?? "Unknown"}
+                    {b.id ? (
+                      <Link
+                        href={`/protected/cash/${b.id}`}
+                        className="hover:underline text-foreground"
+                      >
+                        {b.display_name ?? "Unknown"}
+                      </Link>
+                    ) : (
+                      b.display_name ?? "Unknown"
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(b.total_received_pkr ?? 0)}

@@ -15,13 +15,100 @@ export async function getBankAccounts() {
   return data;
 }
 
-export async function getBankAccountBalances() {
+/** Bank balance row shape (matches bank_account_balances view for compatibility). */
+export type BankAccountBalanceRow = {
+  id: string | null;
+  account_name: string | null;
+  bank_name: string | null;
+  currency_id: string | null;
+  currency_code: string | null;
+  currency_symbol: string | null;
+  opening_balance: number | null;
+  total_deposits: number | null;
+  total_withdrawals: number | null;
+  balance: number | null;
+};
+
+/**
+ * Computes bank account balances from ledger entries using amount_pkr,
+ * ensuring correct multi-currency handling. Replaces the buggy view that
+ * summed raw amount instead of amount_pkr.
+ */
+export async function getBankAccountBalances(): Promise<BankAccountBalanceRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("bank_account_balances")
-    .select("*");
-  if (error) throw error;
-  return data;
+
+  const [accountsResult, ledgerResult] = await Promise.all([
+    supabase
+      .from("bank_accounts")
+      .select(
+        "id, account_name, bank_name, currency_id, opening_balance, currencies(code, symbol, exchange_rate_to_pkr)",
+      )
+      .is("deleted_at", null)
+      .order("account_name"),
+    supabase
+      .from("ledger_entries")
+      .select("bank_account_id, type, amount_pkr")
+      .not("bank_account_id", "is", null)
+      .is("deleted_at", null),
+  ]);
+
+  if (accountsResult.error) throw accountsResult.error;
+  if (ledgerResult.error) throw ledgerResult.error;
+
+  const accounts = accountsResult.data ?? [];
+  const ledgerEntries = ledgerResult.data ?? [];
+
+  const { depositsByAccount, withdrawalsByAccount } = ledgerEntries.reduce(
+    (acc, entry) => {
+      const id = entry.bank_account_id!;
+      const pkr = entry.amount_pkr ?? 0;
+
+      if (entry.type === "donation_bank" || entry.type === "cash_deposit") {
+        acc.depositsByAccount.set(id, (acc.depositsByAccount.get(id) ?? 0) + pkr);
+      } else if (entry.type === "expense_bank") {
+        acc.withdrawalsByAccount.set(
+          id,
+          (acc.withdrawalsByAccount.get(id) ?? 0) + pkr,
+        );
+      }
+      return acc;
+    },
+    {
+      depositsByAccount: new Map<string, number>(),
+      withdrawalsByAccount: new Map<string, number>(),
+    },
+  );
+
+  type CurrencyRelation =
+    | { code: string; symbol: string; exchange_rate_to_pkr: number }
+    | { code: string; symbol: string; exchange_rate_to_pkr: number }[]
+    | null;
+
+  return accounts.map((account) => {
+    const raw = account.currencies as CurrencyRelation;
+    const currency = Array.isArray(raw) ? raw[0] ?? null : raw;
+    const rate = currency?.exchange_rate_to_pkr ?? 1;
+    const rateSafe = rate > 0 ? rate : 1;
+
+    const depositsPkr = depositsByAccount.get(account.id) ?? 0;
+    const withdrawalsPkr = withdrawalsByAccount.get(account.id) ?? 0;
+    const openingPkr =
+      (account.opening_balance ?? 0) * rateSafe;
+    const balancePkr = openingPkr + depositsPkr - withdrawalsPkr;
+
+    return {
+      id: account.id,
+      account_name: account.account_name,
+      bank_name: account.bank_name,
+      currency_id: account.currency_id,
+      currency_code: currency?.code ?? null,
+      currency_symbol: currency?.symbol ?? null,
+      opening_balance: account.opening_balance,
+      total_deposits: depositsPkr / rateSafe,
+      total_withdrawals: withdrawalsPkr / rateSafe,
+      balance: balancePkr / rateSafe,
+    };
+  });
 }
 
 export async function getBankAccountStatement(accountId: string) {

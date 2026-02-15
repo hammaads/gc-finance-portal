@@ -5,11 +5,67 @@ import { Button } from "@/components/ui/button";
 import { Download, FileText } from "lucide-react";
 import { ledgerTypeLabel } from "@/lib/format";
 
+type Donation = {
+  date: string;
+  amount: number;
+  amount_pkr: number;
+  type: string;
+  description: string | null;
+  donors?: {
+    name: string;
+  } | null;
+  currencies?: {
+    code: string;
+  } | null;
+  causes?: {
+    name: string;
+  } | null;
+};
+
+type Expense = {
+  date: string;
+  amount: number;
+  amount_pkr: number;
+  type: string;
+  description: string | null;
+  expense_categories?: {
+    name: string;
+  } | null;
+  currencies?: {
+    code: string;
+  } | null;
+  causes?: {
+    name: string;
+  } | null;
+};
+
+type BankBalance = {
+  account_name?: string | null;
+  bank_name?: string | null;
+  currency_code?: string | null;
+  opening_balance?: number | null;
+  total_deposits?: number | null;
+  total_withdrawals?: number | null;
+  balance?: number | null;
+};
+
+type DriveSummary = {
+  cause_name: string | null;
+  type: string | null;
+  date: string | null;
+  location: string | null;
+  expected_headcount: number | null;
+  total_budget_pkr: number | null;
+  total_spent_pkr: number | null;
+  remaining_budget_pkr: number | null;
+  total_donations_pkr: number | null;
+};
+
 interface ReportsClientProps {
-  donations: any[];
-  expenses: any[];
-  bankBalances: any[];
-  driveSummaries: any[];
+  donations: Donation[];
+  expenses: Expense[];
+  bankBalances: BankBalance[];
+  driveSummaries: DriveSummary[];
 }
 
 function downloadCSV(filename: string, headers: string[], rows: string[][]) {
@@ -36,13 +92,13 @@ export function ReportsClient({
 }: ReportsClientProps) {
   const exportDonationsCSV = () => {
     const headers = ["Date", "Donor", "Type", "Amount", "Currency", "PKR Value", "Cause", "Description"];
-    const rows = donations.map((d: any) => [
-      d.date,
+    const rows = donations.map((d: Donation) => [
+      d.date ?? "",
       d.donors?.name ?? "",
-      ledgerTypeLabel(d.type),
-      d.amount,
+      ledgerTypeLabel(d.type ?? ""),
+      String(d.amount ?? ""),
       d.currencies?.code ?? "",
-      d.amount_pkr,
+      String(d.amount_pkr ?? ""),
       d.causes?.name ?? "",
       d.description ?? "",
     ]);
@@ -51,13 +107,13 @@ export function ReportsClient({
 
   const exportExpensesCSV = () => {
     const headers = ["Date", "Category", "Type", "Amount", "Currency", "PKR Value", "Cause", "Description"];
-    const rows = expenses.map((e: any) => [
-      e.date,
+    const rows = expenses.map((e: Expense) => [
+      e.date ?? "",
       e.expense_categories?.name ?? "",
-      ledgerTypeLabel(e.type),
-      e.amount,
+      ledgerTypeLabel(e.type ?? ""),
+      String(e.amount ?? ""),
       e.currencies?.code ?? "",
-      e.amount_pkr,
+      String(e.amount_pkr ?? ""),
       e.causes?.name ?? "",
       e.description ?? "",
     ]);
@@ -66,30 +122,30 @@ export function ReportsClient({
 
   const exportBankBalancesCSV = () => {
     const headers = ["Account", "Bank", "Currency", "Opening Balance", "Deposits", "Withdrawals", "Balance"];
-    const rows = bankBalances.map((b: any) => [
-      b.account_name,
-      b.bank_name,
-      b.currency_code,
-      b.opening_balance,
-      b.total_deposits,
-      b.total_withdrawals,
-      b.balance,
+    const rows = bankBalances.map((b: BankBalance) => [
+      b.account_name ?? "",
+      b.bank_name ?? "",
+      b.currency_code ?? "",
+      String(b.opening_balance ?? ""),
+      String(b.total_deposits ?? ""),
+      String(b.total_withdrawals ?? ""),
+      String(b.balance ?? ""),
     ]);
     downloadCSV("bank_balances.csv", headers, rows);
   };
 
   const exportDriveSummariesCSV = () => {
     const headers = ["Drive", "Type", "Date", "Location", "Headcount", "Budget", "Spent", "Remaining", "Donations"];
-    const rows = driveSummaries.map((d: any) => [
-      d.cause_name,
-      d.type,
+    const rows = driveSummaries.map((d: DriveSummary) => [
+      d.cause_name ?? "",
+      d.type ?? "",
       d.date ?? "",
       d.location ?? "",
-      d.expected_headcount ?? "",
-      d.total_budget_pkr,
-      d.total_spent_pkr,
-      d.remaining_budget_pkr,
-      d.total_donations_pkr,
+      String(d.expected_headcount ?? ""),
+      String(d.total_budget_pkr ?? ""),
+      String(d.total_spent_pkr ?? ""),
+      String(d.remaining_budget_pkr ?? ""),
+      String(d.total_donations_pkr ?? ""),
     ]);
     downloadCSV("drive_summaries.csv", headers, rows);
   };
