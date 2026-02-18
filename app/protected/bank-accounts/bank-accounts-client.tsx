@@ -51,14 +51,21 @@ type Currency = {
   is_base: boolean;
 };
 
+type Cause = {
+  id: string;
+  name: string;
+};
+
 interface BankAccountsClientProps {
   balances: BankAccountBalance[];
   currencies: Currency[];
+  causes: Cause[];
 }
 
 export function BankAccountsClient({
   balances,
   currencies,
+  causes,
 }: BankAccountsClientProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -187,6 +194,26 @@ export function BankAccountsClient({
                   </p>
                 )}
               </div>
+              {causes.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="default_cause_id">Default Cause (optional)</Label>
+                  <Select name="default_cause_id">
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {causes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-imported donations will be assigned to this cause
+                  </p>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={createPending}>
                   {createPending ? "Creating..." : "Create Account"}
@@ -296,6 +323,29 @@ export function BankAccountsClient({
                   </p>
                 )}
               </div>
+              {causes.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit_default_cause_id">Default Cause (optional)</Label>
+                  <Select
+                    name="default_cause_id"
+                    defaultValue={editingAccount.default_cause_id ?? undefined}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {causes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-imported donations will be assigned to this cause
+                  </p>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={updatePending}>
                   {updatePending ? "Saving..." : "Save Changes"}
