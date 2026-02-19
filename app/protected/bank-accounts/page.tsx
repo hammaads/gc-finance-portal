@@ -2,15 +2,17 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getBankAccountBalances } from "@/lib/actions/bank-accounts";
 import { getCurrencies } from "@/lib/actions/settings";
+import { getCauses } from "@/lib/actions/causes";
 import { BankAccountsClient } from "./bank-accounts-client";
 
 async function BankAccountsContent() {
-  const [balances, currencies] = await Promise.all([
+  const [balances, currencies, causes] = await Promise.all([
     getBankAccountBalances(),
     getCurrencies(),
+    getCauses(),
   ]);
 
-  return <BankAccountsClient balances={balances} currencies={currencies} />;
+  return <BankAccountsClient balances={balances} currencies={currencies} causes={causes} />;
 }
 
 export default function BankAccountsPage() {

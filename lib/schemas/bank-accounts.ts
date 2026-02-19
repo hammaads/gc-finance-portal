@@ -7,6 +7,7 @@ export const bankAccountSchema = z.object({
   account_number: z.string().optional().nullable(),
   currency_id: z.string().uuid("Select a currency"),
   opening_balance: z.coerce.number().min(0, "Balance cannot be negative").default(0),
+  default_cause_id: z.string().uuid().optional().nullable(),
 });
 
 export type BankAccountFormData = z.infer<typeof bankAccountSchema>;

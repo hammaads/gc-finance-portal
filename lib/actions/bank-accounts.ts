@@ -8,7 +8,7 @@ export async function getBankAccounts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("bank_accounts")
-    .select("*, currencies(code, symbol, exchange_rate_to_pkr)")
+    .select("*, currencies(code, symbol, exchange_rate_to_pkr), causes(name)")
     .is("deleted_at", null)
     .order("account_name");
   if (error) throw error;
@@ -27,6 +27,7 @@ export type BankAccountBalanceRow = {
   total_deposits: number | null;
   total_withdrawals: number | null;
   balance: number | null;
+  default_cause_id: string | null;
 };
 
 /**
@@ -41,7 +42,7 @@ export async function getBankAccountBalances(): Promise<BankAccountBalanceRow[]>
     supabase
       .from("bank_accounts")
       .select(
-        "id, account_name, bank_name, currency_id, opening_balance, currencies(code, symbol, exchange_rate_to_pkr)",
+        "id, account_name, bank_name, currency_id, opening_balance, default_cause_id, currencies(code, symbol, exchange_rate_to_pkr)",
       )
       .is("deleted_at", null)
       .order("account_name"),
@@ -107,6 +108,7 @@ export async function getBankAccountBalances(): Promise<BankAccountBalanceRow[]>
       total_deposits: depositsPkr / rateSafe,
       total_withdrawals: withdrawalsPkr / rateSafe,
       balance: balancePkr / rateSafe,
+      default_cause_id: account.default_cause_id ?? null,
     };
   });
 }
@@ -131,6 +133,7 @@ export async function createBankAccount(formData: FormData) {
     account_number: formData.get("account_number") || null,
     currency_id: formData.get("currency_id"),
     opening_balance: formData.get("opening_balance"),
+    default_cause_id: formData.get("default_cause_id") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
@@ -150,6 +153,7 @@ export async function updateBankAccount(formData: FormData) {
     account_number: formData.get("account_number") || null,
     currency_id: formData.get("currency_id"),
     opening_balance: formData.get("opening_balance"),
+    default_cause_id: formData.get("default_cause_id") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 

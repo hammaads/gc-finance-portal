@@ -1,0 +1,9 @@
+name = "donation-email-worker"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+EDGE_FUNCTION_URL = "https://fjyjekhfdkjdancrxvoo.supabase.co/functions/v1/process-bank-email"
+
+# WEBHOOK_API_KEY must be set as a secret:
+#   npx wrangler secret put WEBHOOK_API_KEY
