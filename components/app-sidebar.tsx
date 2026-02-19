@@ -16,6 +16,7 @@ import {
   Settings,
   Moon,
   Sun,
+  Mail,
   LogOut,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -54,6 +55,7 @@ const financeNav = [
 const planningNav = [
   { title: "Projections", href: "/protected/projections", icon: TrendingUp },
   { title: "Reports", href: "/protected/reports", icon: FileText },
+  { title: "Email Logs", href: "/protected/email-logs", icon: Mail },
   { title: "Settings", href: "/protected/settings", icon: Settings },
 ];
 

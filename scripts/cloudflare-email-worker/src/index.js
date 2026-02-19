@@ -28,6 +28,7 @@ export default {
         body: JSON.stringify({
           email_body: rawEmail,
           email_subject: message.headers.get("subject") || "",
+          email_from: message.from || "",
         }),
       });
 
