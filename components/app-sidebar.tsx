@@ -6,23 +6,29 @@ import {
   LayoutDashboard,
   HandCoins,
   Receipt,
-  Car,
   Landmark,
   Wallet,
+  Car,
   Users,
   Package,
   TrendingUp,
   FileText,
+  Mail,
+  ChevronRight,
   Settings,
   Moon,
   Sun,
-  Mail,
   LogOut,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -38,25 +44,24 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-const mainNav = [
+const coreNav = [
   { title: "Dashboard", href: "/protected", icon: LayoutDashboard },
   { title: "Donations", href: "/protected/donations", icon: HandCoins },
   { title: "Expenses", href: "/protected/expenses", icon: Receipt },
-  { title: "Drives & Causes", href: "/protected/drives", icon: Car },
-];
-
-const financeNav = [
   { title: "Bank Accounts", href: "/protected/bank-accounts", icon: Landmark },
   { title: "Cash Management", href: "/protected/cash", icon: Wallet },
-  { title: "Donors", href: "/protected/donors", icon: Users },
   { title: "Inventory", href: "/protected/inventory", icon: Package },
 ];
 
 const planningNav = [
+  { title: "Drives & Causes", href: "/protected/drives", icon: Car },
+  { title: "Donors", href: "/protected/donors", icon: Users },
   { title: "Projections", href: "/protected/projections", icon: TrendingUp },
   { title: "Reports", href: "/protected/reports", icon: FileText },
+];
+
+const systemNav = [
   { title: "Email Logs", href: "/protected/email-logs", icon: Mail },
-  { title: "Settings", href: "/protected/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -68,6 +73,9 @@ export function AppSidebar() {
     if (href === "/protected") return pathname === "/protected";
     return pathname.startsWith(href);
   };
+
+  const planningHasActive = planningNav.some((item) => isActive(item.href));
+  const systemHasActive = systemNav.some((item) => isActive(item.href));
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -93,10 +101,9 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Overview</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {coreNav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
                     <Link href={item.href}>
@@ -110,45 +117,69 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Finance</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {financeNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <Collapsible defaultOpen={planningHasActive} className="group/collapsible">
+          <SidebarGroup>
+            <SidebarGroupLabel asChild>
+              <CollapsibleTrigger className="flex w-full items-center">
+                Planning
+                <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {planningNav.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
+                        <Link href={item.href}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Planning</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {planningNav.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <Collapsible defaultOpen={systemHasActive} className="group/collapsible">
+          <SidebarGroup>
+            <SidebarGroupLabel asChild>
+              <CollapsibleTrigger className="flex w-full items-center">
+                System
+                <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {systemNav.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.title}>
+                        <Link href={item.href}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
       </SidebarContent>
 
       <SidebarFooter className="p-2">
         <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col">
+          <SidebarMenuButton asChild isActive={isActive("/protected/settings")} tooltip="Settings" className="h-8 w-8 p-0 justify-center">
+            <Link href="/protected/settings">
+              <Settings className="h-4 w-4" />
+              <span className="sr-only">Settings</span>
+            </Link>
+          </SidebarMenuButton>
           <Button
             variant="ghost"
             size="icon"
