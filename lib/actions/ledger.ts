@@ -13,11 +13,17 @@ export async function deleteLedgerEntry(
   revalidateVolunteerId?: string
 ) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("ledger_entries")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete ledger entry:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/donations");
   revalidatePath("/protected/expenses");

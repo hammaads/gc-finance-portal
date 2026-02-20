@@ -88,7 +88,10 @@ export async function consumeInventory(formData: FormData) {
     consumed_by: claims.claims.sub as string,
   });
 
-  if (error) return { error: { quantity: [error.message] } };
+  if (error) {
+    console.error("Failed to consume inventory:", error.message);
+    return { error: { quantity: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/inventory");
   revalidatePath("/protected/drives");
@@ -150,7 +153,10 @@ export async function transferCustody(formData: FormData) {
     transferred_by: claims.claims.sub as string,
   });
 
-  if (error) return { error: { quantity: [error.message] } };
+  if (error) {
+    console.error("Failed to transfer custody:", error.message);
+    return { error: { quantity: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/inventory");
   revalidatePath("/protected");
@@ -213,7 +219,10 @@ export async function adjustInventory(formData: FormData) {
     })
     .eq("id", parsed.data.ledger_entry_id);
 
-  if (error) return { error: { new_quantity: [error.message] } };
+  if (error) {
+    console.error("Failed to adjust inventory:", error.message);
+    return { error: { new_quantity: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/inventory");
   revalidatePath("/protected/expenses");

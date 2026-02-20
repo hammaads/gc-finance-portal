@@ -78,7 +78,10 @@ export async function createExpense(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error) return { error: { item_name: [error.message] } };
+  if (error) {
+    console.error("Failed to create expense:", error.message);
+    return { error: { item_name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/expenses");
   revalidatePath("/protected/inventory");
@@ -148,7 +151,10 @@ export async function createBulkExpenses(formData: FormData) {
     .from("ledger_entries")
     .insert(rows)
     .select("id");
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to create bulk expenses:", error.message);
+    return { error: "Failed to save. Please try again." };
+  }
 
   revalidatePath("/protected/expenses");
   revalidatePath("/protected/inventory");
@@ -162,7 +168,10 @@ export async function deleteExpense(id: string) {
     .from("ledger_entries")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete expense:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/expenses");
   revalidatePath("/protected/inventory");

@@ -59,13 +59,19 @@ export async function createCause(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { data: cause, error: causeError } = await supabase
     .from("causes")
     .insert(parsed.data)
     .select()
     .single();
 
-  if (causeError) return { error: { name: [causeError.message] } };
+  if (causeError) {
+    console.error("Failed to create cause:", causeError.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   const budgetItemsJson = formData.get("budget_items");
   if (budgetItemsJson && typeof budgetItemsJson === "string") {
@@ -123,8 +129,14 @@ export async function updateCause(formData: FormData) {
 
   const { id, ...rest } = parsed.data;
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { error } = await supabase.from("causes").update(rest).eq("id", id!);
-  if (error) return { error: { name: [error.message] } };
+  if (error) {
+    console.error("Failed to update cause:", error.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   const budgetItemsJson = formData.get("budget_items");
   if (budgetItemsJson && typeof budgetItemsJson === "string" && id) {
@@ -187,11 +199,17 @@ export async function updateCause(formData: FormData) {
 
 export async function deleteCause(id: string) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("causes")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete cause:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/drives");
   return { success: true };

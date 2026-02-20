@@ -34,7 +34,10 @@ export async function createCashTransfer(formData: FormData) {
     ...parsed.data,
     created_by: claims.claims.sub as string,
   });
-  if (error) return { error: { amount: [error.message] } };
+  if (error) {
+    console.error("Failed to create cash transfer:", error.message);
+    return { error: { amount: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/cash");
   revalidatePath("/protected");
@@ -62,7 +65,10 @@ export async function createCashDeposit(formData: FormData) {
     ...parsed.data,
     created_by: claims.claims.sub as string,
   });
-  if (error) return { error: { amount: [error.message] } };
+  if (error) {
+    console.error("Failed to create cash deposit:", error.message);
+    return { error: { amount: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/cash");
   revalidatePath("/protected/bank-accounts");
