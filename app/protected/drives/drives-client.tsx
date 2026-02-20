@@ -722,12 +722,10 @@ function AddCauseDialog({
 
 function EditCauseDialog({
   cause,
-  templates,
   categories,
   currencies,
 }: {
   cause: Cause;
-  templates: Template[];
   categories: Category[];
   currencies: Currency[];
 }) {
@@ -1125,13 +1123,11 @@ function DeleteCauseDialog({ cause }: { cause: Cause }) {
 function DriveCard({
   cause,
   summary,
-  templates,
   categories,
   currencies,
 }: {
   cause: Cause;
   summary: DriveSummary | undefined;
-  templates: Template[];
   categories: Category[];
   currencies: Currency[];
 }) {
@@ -1155,7 +1151,6 @@ function DriveCard({
           <div className="flex items-center gap-1">
             <EditCauseDialog
               cause={cause}
-              templates={templates}
               categories={categories}
               currencies={currencies}
             />
@@ -1255,7 +1250,6 @@ export function DrivesClient({
                 key={drive.id}
                 cause={drive}
                 summary={summaryMap.get(drive.id)}
-                templates={templates}
                 categories={categories}
                 currencies={currencies}
               />
@@ -1304,7 +1298,6 @@ export function DrivesClient({
                 <div className="flex items-center gap-1">
                   <EditCauseDialog
                     cause={cause}
-                    templates={[]}
                     categories={categories}
                     currencies={currencies}
                   />

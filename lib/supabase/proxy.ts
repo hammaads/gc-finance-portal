@@ -68,7 +68,7 @@ export async function updateSession(request: NextRequest) {
     }
   } else {
     // Unauthenticated users visiting anything outside public paths → send to login
-    const publicPaths = ["/auth", "/transparency"];
+    const publicPaths = ["/auth", "/transparency", "/~offline"];
     const isPublicPath = publicPaths.some(
       (p) => pathname === p || pathname.startsWith(p + "/"),
     );

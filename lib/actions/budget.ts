@@ -188,10 +188,7 @@ export async function deleteDriveTemplate(id: string) {
   return { success: true };
 }
 
-export async function recalculateBudgetItems(
-  causeId: string,
-  _newHeadcount: number
-) {
+export async function recalculateBudgetItems(causeId: string) {
   const supabase = await createClient();
 
   const { data: items, error: fetchError } = await supabase

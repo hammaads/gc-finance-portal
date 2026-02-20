@@ -539,17 +539,6 @@ function getEmptyVariableItem(defaultCurrencyId: string): TemplateItemDraft {
   };
 }
 
-function getEmptyFixedItem(defaultCurrencyId: string): TemplateItemDraft {
-  return {
-    type: "fixed",
-    category_id: "",
-    description: "",
-    price_per_unit: 0,
-    currency_id: defaultCurrencyId,
-    exchange_rate_to_pkr: 1,
-  };
-}
-
 function getDefaultCurrencyId(currencies: Currency[]): string {
   const pkr = currencies.find((c) => c.is_base || c.code === "PKR");
   return pkr?.id ?? currencies[0]?.id ?? "";

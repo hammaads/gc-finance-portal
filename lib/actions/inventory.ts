@@ -178,7 +178,7 @@ export async function adjustInventory(formData: FormData) {
     return { error: { new_quantity: ["Not authenticated"] } };
 
   // Get current consumed quantity to ensure new_quantity >= consumed
-  const { data: item, error: itemError } = await supabase
+  const { data: item } = await supabase
     .from("inventory_current")
     .select("consumed_qty, purchased_qty")
     .eq("ledger_entry_id", parsed.data.ledger_entry_id)
