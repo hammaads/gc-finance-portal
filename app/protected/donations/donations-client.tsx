@@ -2,6 +2,7 @@
 
 import { useState, useActionState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -689,7 +690,14 @@ export function DonationsClient({
 
               return (
                 <TableRow key={donation.id}>
-                  <TableCell>{formatDate(donation.date)}</TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/protected/donations/${donation.id}`}
+                      className="hover:underline text-foreground"
+                    >
+                      {formatDate(donation.date)}
+                    </Link>
+                  </TableCell>
                   <TableCell>{donation.donors?.name ?? "-"}</TableCell>
                   <TableCell className="text-right">
                     {isInKind

@@ -4,16 +4,33 @@ import { createClient } from "@/lib/supabase/server";
 import { donationSchema } from "@/lib/schemas/ledger";
 import { revalidatePath } from "next/cache";
 
-export async function getDonations() {
+const donationSelect =
+  "*, currencies(code, symbol), donors(name), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name), custodian:volunteers!ledger_entries_custodian_id_fkey(name)";
+
+export async function getDonations(includeVoided = false) {
+  const supabase = await createClient();
+  let q = supabase
+    .from("ledger_entries")
+    .select(donationSelect)
+    .in("type", ["donation_bank", "donation_cash", "donation_in_kind"])
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (!includeVoided) q = q.is("deleted_at", null);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data;
+}
+
+/** Single donation for detail screen (GC-FIN-001) */
+export async function getDonationById(id: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ledger_entries")
-    .select("*, currencies(code, symbol), donors(name), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name), custodian:volunteers!ledger_entries_custodian_id_fkey(name)")
+    .select(donationSelect)
+    .eq("id", id)
     .in("type", ["donation_bank", "donation_cash", "donation_in_kind"])
-    .is("deleted_at", null)
-    .order("date", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+    .single();
+  if (error || !data) return null;
   return data;
 }
 
