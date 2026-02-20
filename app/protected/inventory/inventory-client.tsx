@@ -35,7 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowRightLeft, Minus, ShoppingCart, Search } from "lucide-react";
+import { ArrowRightLeft, History, Minus, ShoppingCart, Search } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
@@ -498,11 +498,8 @@ export function InventoryClient({
           <TableRow>
             <TableHead>Item Name</TableHead>
             <TableHead className="text-right">Available</TableHead>
-            <TableHead className="text-right">Purchased</TableHead>
             <TableHead className="text-right">Unit Price</TableHead>
-            <TableHead className="text-right">Total Value (PKR)</TableHead>
             <TableHead>Custodian</TableHead>
-            <TableHead>Purchase Date</TableHead>
             <TableHead className="w-32 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -510,7 +507,7 @@ export function InventoryClient({
           {filtered.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={8}
+                colSpan={5}
                 className="text-center text-muted-foreground"
               >
                 {search
@@ -520,9 +517,6 @@ export function InventoryClient({
             </TableRow>
           ) : (
             filtered.map((item) => {
-              const totalValuePkr =
-                Number(item.available_qty) *
-                (Number(item.amount_pkr) / Number(item.purchased_qty));
               const custodians = custodianData.filter(
                 (c) => c.ledger_entry_id === item.ledger_entry_id,
               );
@@ -535,20 +529,14 @@ export function InventoryClient({
                   <TableCell className="text-right">
                     {Number(item.available_qty)}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {Number(item.purchased_qty)}
-                  </TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(Number(item.unit_price))}
                   </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(totalValuePkr)}
-                  </TableCell>
                   <TableCell>{getCustodianDisplay(item)}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {formatDate(item.purchase_date)}
-                  </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" title="History (coming soon)" disabled>
+                      <History className="size-4 text-muted-foreground" />
+                    </Button>
                     <ConsumeDialog item={item} causes={causes} />
                     <TransferDialog
                       item={item}
