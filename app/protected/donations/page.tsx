@@ -9,10 +9,14 @@ import { getVolunteers } from "@/lib/actions/volunteers";
 import { getItemNameSuggestions } from "@/lib/actions/expenses";
 import { DonationsClient } from "./donations-client";
 
-async function DonationsContent() {
+async function DonationsContent({
+  showVoided,
+}: {
+  showVoided: boolean;
+}) {
   const [donations, donors, currencies, bankAccounts, causes, volunteers, itemNames] =
     await Promise.all([
-      getDonations(),
+      getDonations(showVoided),
       getDonors(),
       getCurrencies(),
       getBankAccounts(),
@@ -24,6 +28,7 @@ async function DonationsContent() {
   return (
     <DonationsClient
       donations={donations}
+      showVoided={showVoided}
       donors={donors}
       currencies={currencies}
       bankAccounts={bankAccounts}
@@ -34,7 +39,14 @@ async function DonationsContent() {
   );
 }
 
-export default function DonationsPage() {
+export default async function DonationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ showVoided?: string }>;
+}) {
+  const { showVoided: showVoidedParam } = await searchParams;
+  const showVoided = showVoidedParam === "true";
+
   return (
     <div className="space-y-6">
       <div>
@@ -43,8 +55,8 @@ export default function DonationsPage() {
           Track and manage incoming donations
         </p>
       </div>
-      <Suspense fallback={<Skeleton className="h-96" />}>
-        <DonationsContent />
+      <Suspense key={String(showVoided)} fallback={<Skeleton className="h-96" />}>
+        <DonationsContent showVoided={showVoided} />
       </Suspense>
     </div>
   );

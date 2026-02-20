@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDonationById } from "@/lib/actions/donations";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { DonationDetailActions } from "./donation-detail-actions";
 
 export default async function DonationDetailPage({
   params,
@@ -16,6 +17,8 @@ export default async function DonationDetailPage({
   if (!donation) notFound();
 
   const isInKind = donation.type === "donation_in_kind";
+  const isVoided = !!(donation as { deleted_at?: string | null }).deleted_at;
+  const voidReason = (donation as { void_reason?: string | null }).void_reason;
   const methodLabel =
     donation.type === "donation_bank"
       ? "Bank"
@@ -46,10 +49,22 @@ export default async function DonationDetailPage({
             {formatDate(donation.date)} · {(donation.donors as { name: string } | null)?.name ?? "Unknown donor"}
           </p>
         </div>
-        <Badge variant={donation.type === "donation_bank" ? "default" : "outline"}>
-          {methodLabel}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isVoided && (
+            <Badge variant="secondary">VOID</Badge>
+          )}
+          <Badge variant={donation.type === "donation_bank" ? "default" : "outline"}>
+            {methodLabel}
+          </Badge>
+          <DonationDetailActions donationId={id} isVoided={isVoided} />
+        </div>
       </div>
+      {isVoided && voidReason && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 p-4">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Void reason</p>
+          <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">{voidReason}</p>
+        </div>
+      )}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <dl className="grid gap-4 sm:grid-cols-2">
@@ -102,3 +117,4 @@ export default async function DonationDetailPage({
     </div>
   );
 }
+

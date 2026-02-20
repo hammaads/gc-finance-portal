@@ -150,3 +150,48 @@ export async function deleteDonation(id: string) {
   revalidatePath("/protected");
   return { success: true };
 }
+
+/** Void donation with required reason (GC-FIN-002). Requires void_reason column. */
+export async function voidDonation(id: string, reason: string) {
+  const trimmed = reason?.trim();
+  if (!trimmed) return { error: { reason: ["Void reason is required."] } };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ledger_entries")
+    .update({
+      deleted_at: new Date().toISOString(),
+      void_reason: trimmed,
+    } as Record<string, unknown>)
+    .eq("id", id);
+  if (error) {
+    console.error("Failed to void donation:", error.message);
+    return { error: { reason: ["Failed to void. Please try again."] } };
+  }
+
+  revalidatePath("/protected/donations");
+  revalidatePath("/protected/donations/[id]");
+  revalidatePath("/protected");
+  return { success: true };
+}
+
+/** Restore a voided donation (GC-FIN-002). */
+export async function unvoidDonation(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ledger_entries")
+    .update({
+      deleted_at: null,
+      void_reason: null,
+    } as Record<string, unknown>)
+    .eq("id", id);
+  if (error) {
+    console.error("Failed to un-void donation:", error.message);
+    return { error: "Failed to restore. Please try again." };
+  }
+
+  revalidatePath("/protected/donations");
+  revalidatePath("/protected/donations/[id]");
+  revalidatePath("/protected");
+  return { success: true };
+}

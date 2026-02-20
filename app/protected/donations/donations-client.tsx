@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
@@ -41,7 +42,7 @@ import { Plus, Trash2, CalendarIcon, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { createDonation, deleteDonation } from "@/lib/actions/donations";
+import { createDonation, voidDonation, unvoidDonation } from "@/lib/actions/donations";
 import { DonorAutocomplete } from "@/components/ui/donor-combobox";
 import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,8 @@ type Donation = {
   to_user_id: string | null;
   item_name: string | null;
   quantity: number | null;
+  deleted_at: string | null;
+  void_reason: string | null;
   currencies: { code: string; symbol: string } | null;
   donors: { name: string } | null;
   causes: { name: string } | null;
@@ -107,6 +110,7 @@ type Volunteer = {
 
 interface DonationsClientProps {
   donations: Donation[];
+  showVoided: boolean;
   donors: Donor[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
@@ -115,61 +119,103 @@ interface DonationsClientProps {
   itemNames: string[];
 }
 
-// ── Delete Donation Dialog ──
+// ── Void Donation Dialog (GC-FIN-002) ──
 
-function DeleteDonationDialog({ donation }: { donation: Donation }) {
+function VoidDonationDialog({ donation }: { donation: Donation }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, setPending] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deleteDonation(donation.id);
-    if ("success" in result && result.success) {
-      toast.success("Donation deleted");
+  async function handleVoid(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reason.trim()) return;
+    setPending(true);
+    const result = await voidDonation(donation.id, reason.trim());
+    setPending(false);
+    if (result?.error && "reason" in result.error) {
+      toast.error(result.error.reason[0]);
+      return;
+    }
+    if (!result?.error) {
+      toast.success("Donation voided");
       setOpen(false);
+      setReason("");
       router.refresh();
     } else {
-      toast.error("Failed to delete donation");
+      toast.error("Failed to void donation");
     }
-    setDeleting(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setReason(""); }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" title="Void donation">
           <Trash2 className="size-4 text-destructive" />
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Donation</DialogTitle>
+          <DialogTitle>Void Donation</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete this donation of{" "}
-          <span className="font-medium text-foreground">
-            {donation.currencies?.symbol ?? ""}{" "}
-            {donation.amount.toLocaleString()}
-          </span>
-          ? This action cannot be undone.
+          Voiding excludes this donation from totals. A reason is required.
         </p>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline">
-              Cancel
+        <form onSubmit={handleVoid} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="void-reason">Reason (required)</Label>
+            <Textarea
+              id="void-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Duplicate entry, wrong amount"
+              rows={3}
+              required
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="submit" variant="destructive" disabled={pending || !reason.trim()}>
+              {pending ? "Voiding..." : "Void"}
             </Button>
-          </DialogClose>
-          <Button
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {deleting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogFooter>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Restore (un-void) button for voided row ──
+
+function RestoreDonationButton({ donation }: { donation: Donation }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function handleRestore() {
+    setPending(true);
+    const result = await unvoidDonation(donation.id);
+    setPending(false);
+    if (!result?.error) {
+      toast.success("Donation restored");
+      router.refresh();
+    } else {
+      toast.error("Failed to restore");
+    }
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleRestore}
+      disabled={pending}
+    >
+      {pending ? "Restoring..." : "Restore"}
+    </Button>
   );
 }
 
@@ -632,6 +678,7 @@ export function AddDonationDialog({
 
 export function DonationsClient({
   donations,
+  showVoided,
   donors,
   currencies,
   bankAccounts,
@@ -641,16 +688,24 @@ export function DonationsClient({
 }: DonationsClientProps) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <h2 className="text-lg font-medium">All Donations</h2>
-        <AddDonationDialog
-          donors={donors}
-          currencies={currencies}
-          bankAccounts={bankAccounts}
-          causes={causes}
-          volunteers={volunteers}
-          itemNames={itemNames}
-        />
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Show voided</span>
+          <Button variant={showVoided ? "default" : "outline"} size="sm" asChild>
+            <Link href={showVoided ? "/protected/donations" : "/protected/donations?showVoided=true"}>
+              {showVoided ? "On" : "Off"}
+            </Link>
+          </Button>
+          <AddDonationDialog
+            donors={donors}
+            currencies={currencies}
+            bankAccounts={bankAccounts}
+            causes={causes}
+            volunteers={volunteers}
+            itemNames={itemNames}
+          />
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -673,12 +728,13 @@ export function DonationsClient({
                 colSpan={9}
                 className="text-center text-muted-foreground"
               >
-                No donations yet. Add one to get started.
+                {showVoided ? "No voided donations." : "No donations yet. Add one to get started."}
               </TableCell>
             </TableRow>
           ) : (
             donations.map((donation) => {
               const isInKind = donation.type === "donation_in_kind";
+              const isVoided = !!donation.deleted_at;
               const pkrValue = donation.amount * donation.exchange_rate_to_pkr;
               const methodLabel =
                 donation.type === "donation_bank" ? "Bank" : donation.type === "donation_cash" ? "Cash" : "In-Kind";
@@ -689,7 +745,7 @@ export function DonationsClient({
                   : donation.to_user?.name ?? "-";
 
               return (
-                <TableRow key={donation.id}>
+                <TableRow key={donation.id} className={isVoided ? "opacity-75" : undefined}>
                   <TableCell>
                     <Link
                       href={`/protected/donations/${donation.id}`}
@@ -708,7 +764,10 @@ export function DonationsClient({
                   <TableCell className="text-right">
                     {isInKind ? "-" : formatCurrency(pkrValue, "Rs")}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="space-x-1">
+                    {isVoided && (
+                      <Badge variant="secondary" className="mr-1">VOID</Badge>
+                    )}
                     <Badge
                       variant={
                         donation.type === "donation_bank"
@@ -721,8 +780,12 @@ export function DonationsClient({
                   </TableCell>
                   <TableCell>{donation.causes?.name ?? "-"}</TableCell>
                   <TableCell>{recipient}</TableCell>
-                  <TableCell className="text-right">
-                    <DeleteDonationDialog donation={donation} />
+                  <TableCell className="text-right flex items-center justify-end gap-1">
+                    {isVoided ? (
+                      <RestoreDonationButton donation={donation} />
+                    ) : (
+                      <VoidDonationDialog donation={donation} />
+                    )}
                   </TableCell>
                 </TableRow>
               );
