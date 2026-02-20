@@ -9,6 +9,16 @@ const baseLedgerSchema = z.object({
   cause_id: z.string().uuid().optional().nullable(),
 });
 
+/** Base for cash transfer/deposit: currency and rate optional (GC-UX-001 – system default) */
+const baseCashSchema = z.object({
+  amount: z.coerce.number().positive("Amount must be positive"),
+  currency_id: z.string().uuid().optional(),
+  exchange_rate_to_pkr: z.coerce.number().positive().optional(),
+  date: z.string().min(1, "Date is required"),
+  description: z.string().optional().nullable(),
+  cause_id: z.string().uuid().optional().nullable(),
+});
+
 export const donationBankSchema = baseLedgerSchema.extend({
   type: z.literal("donation_bank"),
   donor_id: z.string().uuid("Select a donor"),
@@ -39,13 +49,13 @@ export const expenseCashSchema = expenseBaseSchema.extend({
   from_user_id: z.string().uuid("Select a paying volunteer"),
 });
 
-export const cashTransferSchema = baseLedgerSchema.extend({
+export const cashTransferSchema = baseCashSchema.extend({
   type: z.literal("cash_transfer"),
   from_user_id: z.string().uuid("Select source volunteer"),
   to_user_id: z.string().uuid("Select destination volunteer"),
 });
 
-export const cashDepositSchema = baseLedgerSchema.extend({
+export const cashDepositSchema = baseCashSchema.extend({
   type: z.literal("cash_deposit"),
   from_user_id: z.string().uuid("Select depositing volunteer"),
   bank_account_id: z.string().uuid("Select a bank account"),

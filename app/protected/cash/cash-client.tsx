@@ -80,19 +80,15 @@ export function CashClient({
 }: CashClientProps) {
   const router = useRouter();
 
-  // Transfer dialog state
+  // Transfer dialog state (GC-UX-001: no currency/exchange in UI)
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferFromId, setTransferFromId] = useState("");
   const [transferToId, setTransferToId] = useState("");
-  const [transferCurrencyId, setTransferCurrencyId] = useState("");
-  const [transferExchangeRate, setTransferExchangeRate] = useState("");
 
   // Deposit dialog state
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositFromId, setDepositFromId] = useState("");
   const [depositBankAccountId, setDepositBankAccountId] = useState("");
-  const [depositCurrencyId, setDepositCurrencyId] = useState("");
-  const [depositExchangeRate, setDepositExchangeRate] = useState("");
 
   // Transfer action
   const [transferState, transferAction, transferPending] = useActionState(
@@ -125,8 +121,6 @@ export function CashClient({
     if (!transferOpen) {
       setTransferFromId("");
       setTransferToId("");
-      setTransferCurrencyId("");
-      setTransferExchangeRate("");
     }
   }, [transferOpen]);
 
@@ -135,30 +129,8 @@ export function CashClient({
     if (!depositOpen) {
       setDepositFromId("");
       setDepositBankAccountId("");
-      setDepositCurrencyId("");
-      setDepositExchangeRate("");
     }
   }, [depositOpen]);
-
-  // Auto-fill exchange rate when currency changes (transfer)
-  useEffect(() => {
-    if (transferCurrencyId) {
-      const currency = currencies.find((c) => c.id === transferCurrencyId);
-      if (currency) {
-        setTransferExchangeRate(String(currency.exchange_rate_to_pkr));
-      }
-    }
-  }, [transferCurrencyId, currencies]);
-
-  // Auto-fill exchange rate when currency changes (deposit)
-  useEffect(() => {
-    if (depositCurrencyId) {
-      const currency = currencies.find((c) => c.id === depositCurrencyId);
-      if (currency) {
-        setDepositExchangeRate(String(currency.exchange_rate_to_pkr));
-      }
-    }
-  }, [depositCurrencyId, currencies]);
 
   const formErrors = (state: Record<string, unknown> | null) =>
     ((state as { error?: Record<string, string[]> })?.error ?? {});
@@ -192,11 +164,6 @@ export function CashClient({
             <form action={transferAction} className="space-y-4">
               <input type="hidden" name="from_user_id" value={transferFromId} />
               <input type="hidden" name="to_user_id" value={transferToId} />
-              <input
-                type="hidden"
-                name="currency_id"
-                value={transferCurrencyId}
-              />
 
               <div className="space-y-2">
                 <Label>From Volunteer</Label>
@@ -247,7 +214,7 @@ export function CashClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="transfer-amount">Amount</Label>
+                  <Label htmlFor="transfer-amount">Amount (PKR)</Label>
                   <Input
                     id="transfer-amount"
                     name="amount"
@@ -259,53 +226,6 @@ export function CashClient({
                   {formErrors(transferState).amount && (
                     <p className="text-sm text-destructive">
                       {formErrors(transferState).amount![0]}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select
-                    value={transferCurrencyId}
-                    onValueChange={setTransferCurrencyId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.code} ({c.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formErrors(transferState).currency_id && (
-                    <p className="text-sm text-destructive">
-                      {formErrors(transferState).currency_id![0]}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-exchange-rate">
-                    Exchange Rate (to PKR)
-                  </Label>
-                  <Input
-                    id="transfer-exchange-rate"
-                    name="exchange_rate_to_pkr"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    value={transferExchangeRate}
-                    onChange={(e) => setTransferExchangeRate(e.target.value)}
-                    required
-                  />
-                  {formErrors(transferState).exchange_rate_to_pkr && (
-                    <p className="text-sm text-destructive">
-                      {formErrors(transferState).exchange_rate_to_pkr![0]}
                     </p>
                   )}
                 </div>
@@ -371,11 +291,6 @@ export function CashClient({
                 name="bank_account_id"
                 value={depositBankAccountId}
               />
-              <input
-                type="hidden"
-                name="currency_id"
-                value={depositCurrencyId}
-              />
 
               <div className="space-y-2">
                 <Label>From Volunteer</Label>
@@ -428,7 +343,7 @@ export function CashClient({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="deposit-amount">Amount</Label>
+                  <Label htmlFor="deposit-amount">Amount (PKR)</Label>
                   <Input
                     id="deposit-amount"
                     name="amount"
@@ -440,53 +355,6 @@ export function CashClient({
                   {formErrors(depositState).amount && (
                     <p className="text-sm text-destructive">
                       {formErrors(depositState).amount![0]}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select
-                    value={depositCurrencyId}
-                    onValueChange={setDepositCurrencyId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.code} ({c.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formErrors(depositState).currency_id && (
-                    <p className="text-sm text-destructive">
-                      {formErrors(depositState).currency_id![0]}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="deposit-exchange-rate">
-                    Exchange Rate (to PKR)
-                  </Label>
-                  <Input
-                    id="deposit-exchange-rate"
-                    name="exchange_rate_to_pkr"
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    value={depositExchangeRate}
-                    onChange={(e) => setDepositExchangeRate(e.target.value)}
-                    required
-                  />
-                  {formErrors(depositState).exchange_rate_to_pkr && (
-                    <p className="text-sm text-destructive">
-                      {formErrors(depositState).exchange_rate_to_pkr![0]}
                     </p>
                   )}
                 </div>

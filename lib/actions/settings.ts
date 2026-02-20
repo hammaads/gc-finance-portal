@@ -97,6 +97,20 @@ export async function getCurrencies() {
   return data;
 }
 
+/** Base currency (e.g. PKR) for defaulting cash transfer/deposit (GC-UX-001) */
+export async function getBaseCurrency() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("currencies")
+    .select("id, exchange_rate_to_pkr")
+    .is("deleted_at", null)
+    .eq("is_base", true)
+    .limit(1)
+    .single();
+  if (error || !data) return null;
+  return data;
+}
+
 export async function createCurrency(formData: FormData) {
   const parsed = currencySchema.safeParse({
     code: formData.get("code"),
