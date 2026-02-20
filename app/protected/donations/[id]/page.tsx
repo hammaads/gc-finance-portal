@@ -106,6 +106,14 @@ export default async function DonationDetailPage({
               <dd className="mt-1">{(donation.causes as { name: string }).name}</dd>
             </div>
           )}
+          {isInKind && donation.item_name && (
+            <div className="sm:col-span-2">
+              <dt className="text-sm font-medium text-muted-foreground">Linked inventory</dt>
+              <dd className="mt-1">
+                This in-kind donation adds to inventory: <strong>{donation.item_name}</strong> (+{Number(donation.quantity ?? 0)}).
+              </dd>
+            </div>
+          )}
         </dl>
         {donation.description && (
           <div>

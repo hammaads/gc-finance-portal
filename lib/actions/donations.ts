@@ -4,6 +4,25 @@ import { createClient } from "@/lib/supabase/server";
 import { donationSchema } from "@/lib/schemas/ledger";
 import { revalidatePath } from "next/cache";
 
+/** Resolve canonical item name (case-insensitive, trim) for inventory linkage (GC-FIN-003, GC-INV-001). */
+export async function resolveCanonicalItemName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  itemName: string
+): Promise<string> {
+  const normalized = itemName?.trim() ?? "";
+  if (!normalized) return itemName;
+  const { data: rows } = await supabase
+    .from("ledger_entries")
+    .select("item_name")
+    .in("type", ["donation_in_kind", "expense_bank", "expense_cash"])
+    .is("deleted_at", null)
+    .not("item_name", "is", null);
+  const match = (rows ?? []).find(
+    (r) => (r as { item_name: string }).item_name?.trim().toLowerCase() === normalized.toLowerCase()
+  );
+  return match ? (match as { item_name: string }).item_name : itemName.trim();
+}
+
 const donationSelect =
   "*, currencies(code, symbol), donors(name), causes(name), bank_accounts(account_name), to_user:volunteers!ledger_entries_to_user_id_fkey(name), custodian:volunteers!ledger_entries_custodian_id_fkey(name)";
 
@@ -102,12 +121,20 @@ export async function createDonation(formData: FormData) {
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) return { error: { amount: ["Not authenticated"] } };
 
-  // For in-kind donations, fill in monetary defaults (amount=0, PKR currency)
+  // For in-kind donations: use canonical item name (case-insensitive match) so inventory groups correctly (GC-FIN-003)
   let insertData: Record<string, unknown> = {
     ...parsed.data,
     created_by: claims.claims.sub as string,
   };
   if (type === "donation_in_kind") {
+    const canonicalName = await resolveCanonicalItemName(
+      supabase,
+      (parsed.data as { item_name: string }).item_name
+    );
+    insertData = {
+      ...insertData,
+      item_name: canonicalName,
+    };
     const { data: pkr } = await supabase
       .from("currencies")
       .select("id")
