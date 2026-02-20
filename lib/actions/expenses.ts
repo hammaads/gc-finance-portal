@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { expenseSchema } from "@/lib/schemas/ledger";
+import { resolveCanonicalItemName } from "@/lib/actions/donations";
 import { revalidatePath } from "next/cache";
 
 export async function getExpenses() {
@@ -70,10 +71,12 @@ export async function createExpense(formData: FormData) {
   if (!claims?.claims?.sub)
     return { error: { item_name: ["Not authenticated"] } };
 
+  const canonicalName = await resolveCanonicalItemName(supabase, parsed.data.item_name);
   const { data: inserted, error } = await supabase
     .from("ledger_entries")
     .insert({
       ...parsed.data,
+      item_name: canonicalName,
       created_by: claims.claims.sub as string,
     })
     .select("id")
@@ -142,10 +145,13 @@ export async function createBulkExpenses(formData: FormData) {
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) return { error: "Not authenticated" };
 
-  const rows = validatedItems.map((item) => ({
-    ...item,
-    created_by: claims.claims.sub as string,
-  }));
+  const rows = await Promise.all(
+    validatedItems.map(async (item) => ({
+      ...item,
+      item_name: await resolveCanonicalItemName(supabase, item.item_name),
+      created_by: claims.claims.sub as string,
+    }))
+  );
 
   const { data: inserted, error } = await supabase
     .from("ledger_entries")
