@@ -623,7 +623,7 @@ export function AddExpenseDialog({
             </div>
           )}
 
-          {/* Drive */}
+          {/* Drive (GC-EXP-003: hint for general vs drive-specific) */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
               Drive
@@ -650,6 +650,9 @@ export function AddExpenseDialog({
                   ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Assign reusable items to General; assign drive-specific items to the selected drive.
+            </p>
           </div>
 
           {/* Custodian (only for general expenses) */}

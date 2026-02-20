@@ -199,6 +199,7 @@ export async function deleteExpense(id: string) {
   return { success: true };
 }
 
+/** Void expense (GC-EXP-004: voided rows excluded from inventory/reporting via deleted_at). */
 export async function voidExpense(id: string, reason: string) {
   const trimmed = reason?.trim();
   if (!trimmed) return { error: { reason: ["Void reason is required."] } };
