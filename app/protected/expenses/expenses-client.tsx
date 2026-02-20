@@ -794,10 +794,20 @@ export function ExpensesClient({
               return (
                 <TableRow key={expense.id}>
                   <TableCell className="whitespace-nowrap">
-                    {formatDate(expense.date)}
+                    <Link
+                      href={`/protected/expenses/${expense.id}`}
+                      className="hover:underline text-foreground"
+                    >
+                      {formatDate(expense.date)}
+                    </Link>
                   </TableCell>
                   <TableCell className="font-medium">
-                    {expense.item_name ?? "-"}
+                    <Link
+                      href={`/protected/expenses/${expense.id}`}
+                      className="hover:underline text-foreground"
+                    >
+                      {expense.item_name ?? "-"}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     {expense.expense_categories?.name ?? "-"}
