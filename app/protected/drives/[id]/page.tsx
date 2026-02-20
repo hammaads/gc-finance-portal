@@ -23,12 +23,16 @@ import { getCause, getDriveFinancialSummary } from "@/lib/actions/causes";
 import { getBudgetItems, getBudgetVsActual } from "@/lib/actions/budget";
 import { getExpenseCategories, getCurrencies } from "@/lib/actions/settings";
 import { getDriveExpenseBreakdown, getInventoryItems } from "@/lib/actions/inventory";
+import { getBankAccounts } from "@/lib/actions/bank-accounts";
+import { getVolunteers } from "@/lib/actions/volunteers";
+import { getItemNameSuggestions } from "@/lib/actions/expenses";
+import { getReceiptSetting } from "@/lib/actions/receipts";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { DriveDetailClient } from "./drive-detail-client";
 import { DriveExpensesClient } from "./drive-expenses-client";
 
 async function DriveDetailContent({ id }: { id: string }) {
-  const [cause, summary, budgetItems, budgetVsActual, categories, currencies, expenseBreakdown, inventoryItems] =
+  const [cause, summary, budgetItems, budgetVsActual, categories, currencies, expenseBreakdown, inventoryItems, bankAccounts, volunteers, itemNames, receiptRequired] =
     await Promise.all([
       getCause(id),
       getDriveFinancialSummary(id).catch(() => null),
@@ -38,7 +42,13 @@ async function DriveDetailContent({ id }: { id: string }) {
       getCurrencies(),
       getDriveExpenseBreakdown(id),
       getInventoryItems(),
+      getBankAccounts(),
+      getVolunteers(),
+      getItemNameSuggestions(),
+      getReceiptSetting(),
     ]);
+
+  const driveCause = [{ id: cause.id, name: cause.name, type: cause.type }];
 
   return (
     <div className="space-y-6">
@@ -153,6 +163,13 @@ async function DriveDetailContent({ id }: { id: string }) {
             consumedItems={expenseBreakdown.consumedItems}
             inventoryItems={inventoryItems}
             causeId={id}
+            categories={categories}
+            currencies={currencies}
+            bankAccounts={bankAccounts}
+            causes={driveCause}
+            volunteers={volunteers}
+            itemNames={itemNames}
+            receiptRequired={receiptRequired}
           />
         </TabsContent>
 

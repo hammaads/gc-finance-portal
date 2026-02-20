@@ -329,6 +329,19 @@ function ReceiptUpload({
 
 // ── Add Expense Dialog ──
 
+export type AddExpenseDialogProps = {
+  categories: ExpenseCategory[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  volunteers: Volunteer[];
+  itemNames: string[];
+  receiptRequired: boolean;
+  defaultCauseId?: string;
+  lockCause?: boolean;
+  triggerLabel?: string;
+};
+
 export function AddExpenseDialog({
   categories,
   currencies,
@@ -337,15 +350,10 @@ export function AddExpenseDialog({
   volunteers,
   itemNames,
   receiptRequired,
-}: {
-  categories: ExpenseCategory[];
-  currencies: Currency[];
-  bankAccounts: BankAccount[];
-  causes: Cause[];
-  volunteers: Volunteer[];
-  itemNames: string[];
-  receiptRequired: boolean;
-}) {
+  defaultCauseId,
+  lockCause = false,
+  triggerLabel = "Add Expense",
+}: AddExpenseDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<"bank" | "cash">("bank");
@@ -353,7 +361,7 @@ export function AddExpenseDialog({
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [causeId, setCauseId] = useState("");
+  const [causeId, setCauseId] = useState(defaultCauseId ?? "");
   const [custodianId, setCustodianId] = useState("");
   const [bankAccountId, setBankAccountId] = useState(
     bankAccounts.length > 0 ? bankAccounts[0].id : "",
@@ -434,7 +442,7 @@ export function AddExpenseDialog({
     setQuantity("1");
     setUnitPrice("");
     setCategoryId("");
-    setCauseId("");
+    setCauseId(defaultCauseId ?? "");
     setCustodianId("");
     setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setFromUserId("");
@@ -454,7 +462,7 @@ export function AddExpenseDialog({
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-1 size-4" />
-          Add Expense
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm gap-0 p-5">
@@ -705,33 +713,44 @@ export function AddExpenseDialog({
           )}
 
           {/* Drive */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              Drive
-            </label>
-            <Select
-              value={causeId || "__general__"}
-              onValueChange={(v) =>
-                setCauseId(v === "__general__" ? "" : v)
-              }
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="General" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__general__">
-                  General (Inventory)
-                </SelectItem>
-                {causes
-                  .filter((cause) => cause.type === "drive")
-                  .map((cause) => (
-                    <SelectItem key={cause.id} value={cause.id}>
-                      {cause.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {lockCause ? (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Drive
+              </label>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {causes.find((cause) => cause.id === causeId)?.name ?? "Current drive"}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Drive
+              </label>
+              <Select
+                value={causeId || "__general__"}
+                onValueChange={(v) =>
+                  setCauseId(v === "__general__" ? "" : v)
+                }
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="General" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__general__">
+                    General (Inventory)
+                  </SelectItem>
+                  {causes
+                    .filter((cause) => cause.type === "drive")
+                    .map((cause) => (
+                      <SelectItem key={cause.id} value={cause.id}>
+                        {cause.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Custodian (only for general expenses) */}
           {isGeneral && (

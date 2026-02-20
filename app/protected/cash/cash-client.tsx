@@ -21,19 +21,31 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRightLeft, Landmark } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Check,
+  ChevronDown,
+  Landmark,
+} from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   createCashDeposit,
   createCashTransfer,
@@ -74,6 +86,123 @@ interface CashClientProps {
   volunteers: Profile[];
   currencies: Currency[];
   bankAccounts: BankAccount[];
+}
+
+type SearchableOption = {
+  id: string;
+  label: string;
+  secondary?: string;
+  searchText?: string;
+};
+
+function SearchableSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  searchPlaceholder,
+  emptyMessage,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: SearchableOption[];
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyMessage: string;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  const selected = options.find((option) => option.id === value) ?? null;
+  const normalizedSearch = searchText.trim().toLowerCase();
+  const filteredOptions = normalizedSearch
+    ? options.filter((option) => {
+        const haystack = [
+          option.label,
+          option.secondary ?? "",
+          option.searchText ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedSearch);
+      })
+    : options;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            "w-full justify-between font-normal",
+            !selected && "text-muted-foreground",
+          )}
+        >
+          {selected ? selected.label : placeholder}
+          <ChevronDown className="ml-2 size-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={searchPlaceholder}
+            value={searchText}
+            onValueChange={setSearchText}
+          />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {filteredOptions.map((option) => (
+                <CommandItem
+                  key={option.id}
+                  value={option.id}
+                  onSelect={() => {
+                    onChange(option.id);
+                    setOpen(false);
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate">{option.label}</p>
+                      {option.secondary ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {option.secondary}
+                        </p>
+                      ) : null}
+                    </div>
+                    {value === option.id ? (
+                      <Check className="size-3.5 text-emerald-600" />
+                    ) : null}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function bankAccountOption(account: BankAccount): SearchableOption {
+  const currencyCode = account.currencies?.code
+    ? ` - ${account.currencies.code}`
+    : "";
+  return {
+    id: account.id,
+    label: `${account.account_name} (${account.bank_name}${currencyCode})`,
+    secondary: `${account.bank_name}${currencyCode}`,
+    searchText: `${account.account_name} ${account.bank_name} ${account.currencies?.code ?? ""}`,
+  };
 }
 
 export function CashClient({
@@ -169,6 +298,16 @@ export function CashClient({
       (b.total_spent_pkr ?? 0) !== 0,
   );
 
+  const volunteerOptions: SearchableOption[] = volunteers.map((volunteer) => ({
+    id: volunteer.id,
+    label: volunteer.name,
+    searchText: volunteer.name,
+  }));
+
+  const bankAccountOptions: SearchableOption[] = bankAccounts.map((account) =>
+    bankAccountOption(account),
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end gap-2">
@@ -189,18 +328,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>From Volunteer</Label>
-                <Select value={transferFromId} onValueChange={setTransferFromId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select volunteer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {volunteers.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={transferFromId}
+                  onChange={setTransferFromId}
+                  options={volunteerOptions}
+                  placeholder="Select volunteer"
+                  searchPlaceholder="Search volunteer..."
+                  emptyMessage="No volunteers found."
+                />
                 {formErrors(transferState).from_user_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(transferState).from_user_id![0]}
@@ -210,20 +345,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>To Volunteer</Label>
-                <Select value={transferToId} onValueChange={setTransferToId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select volunteer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {volunteers
-                      .filter((p) => p.id !== transferFromId)
-                      .map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={transferToId}
+                  onChange={setTransferToId}
+                  options={volunteerOptions.filter((option) => option.id !== transferFromId)}
+                  placeholder="Select volunteer"
+                  searchPlaceholder="Search volunteer..."
+                  emptyMessage="No volunteers found."
+                />
                 {formErrors(transferState).to_user_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(transferState).to_user_id![0]}
@@ -305,18 +434,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>From Volunteer</Label>
-                <Select value={depositFromId} onValueChange={setDepositFromId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select volunteer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {volunteers.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={depositFromId}
+                  onChange={setDepositFromId}
+                  options={volunteerOptions}
+                  placeholder="Select volunteer"
+                  searchPlaceholder="Search volunteer..."
+                  emptyMessage="No volunteers found."
+                />
                 {formErrors(depositState).from_user_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(depositState).from_user_id![0]}
@@ -326,22 +451,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>To Bank Account</Label>
-                <Select
+                <SearchableSelect
                   value={depositBankAccountId}
-                  onValueChange={setDepositBankAccountId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select bank account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bankAccounts.map((ba) => (
-                      <SelectItem key={ba.id} value={ba.id}>
-                        {ba.account_name} ({ba.bank_name}
-                        {ba.currencies ? ` - ${ba.currencies.code}` : ""})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={setDepositBankAccountId}
+                  options={bankAccountOptions}
+                  placeholder="Select bank account"
+                  searchPlaceholder="Search bank account..."
+                  emptyMessage="No bank accounts found."
+                />
                 {formErrors(depositState).bank_account_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(depositState).bank_account_id![0]}
@@ -423,22 +540,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>From Bank Account</Label>
-                <Select
+                <SearchableSelect
                   value={withdrawBankAccountId}
-                  onValueChange={setWithdrawBankAccountId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select bank account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bankAccounts.map((ba) => (
-                      <SelectItem key={ba.id} value={ba.id}>
-                        {ba.account_name} ({ba.bank_name}
-                        {ba.currencies ? ` - ${ba.currencies.code}` : ""})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={setWithdrawBankAccountId}
+                  options={bankAccountOptions}
+                  placeholder="Select bank account"
+                  searchPlaceholder="Search bank account..."
+                  emptyMessage="No bank accounts found."
+                />
                 {formErrors(withdrawState).bank_account_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(withdrawState).bank_account_id![0]}
@@ -448,18 +557,14 @@ export function CashClient({
 
               <div className="space-y-2">
                 <Label>To Volunteer</Label>
-                <Select value={withdrawToId} onValueChange={setWithdrawToId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select volunteer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {volunteers.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={withdrawToId}
+                  onChange={setWithdrawToId}
+                  options={volunteerOptions}
+                  placeholder="Select volunteer"
+                  searchPlaceholder="Search volunteer..."
+                  emptyMessage="No volunteers found."
+                />
                 {formErrors(withdrawState).to_user_id && (
                   <p className="text-sm text-destructive">
                     {formErrors(withdrawState).to_user_id![0]}
