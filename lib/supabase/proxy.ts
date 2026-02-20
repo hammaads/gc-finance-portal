@@ -67,8 +67,12 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
   } else {
-    // Unauthenticated users visiting anything outside /auth → send to login
-    if (!pathname.startsWith("/auth")) {
+    // Unauthenticated users visiting anything outside public paths → send to login
+    const publicPaths = ["/auth", "/transparency"];
+    const isPublicPath = publicPaths.some(
+      (p) => pathname === p || pathname.startsWith(p + "/"),
+    );
+    if (!isPublicPath) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth/login";
       return NextResponse.redirect(url);
