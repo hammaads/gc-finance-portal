@@ -8,6 +8,7 @@ export const causeSchema = z.object({
   date: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   expected_headcount: z.coerce.number().int().positive().optional().nullable(),
+  number_of_daigs: z.coerce.number().int().positive().optional().nullable(),
 });
 
 export type CauseFormData = z.infer<typeof causeSchema>;

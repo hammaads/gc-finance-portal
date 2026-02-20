@@ -55,6 +55,7 @@ export async function createCause(formData: FormData) {
     date: formData.get("date") || null,
     location: formData.get("location") || null,
     expected_headcount: formData.get("expected_headcount") || null,
+    number_of_daigs: formData.get("number_of_daigs") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
@@ -124,6 +125,7 @@ export async function updateCause(formData: FormData) {
     date: formData.get("date") || null,
     location: formData.get("location") || null,
     expected_headcount: formData.get("expected_headcount") || null,
+    number_of_daigs: formData.get("number_of_daigs") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 

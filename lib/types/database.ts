@@ -137,6 +137,7 @@ export type Database = {
           id: string
           location: string | null
           name: string
+          number_of_daigs: number | null
           type: string
           updated_at: string
         }
@@ -149,6 +150,7 @@ export type Database = {
           id?: string
           location?: string | null
           name: string
+          number_of_daigs?: number | null
           type: string
           updated_at?: string
         }
@@ -161,6 +163,7 @@ export type Database = {
           id?: string
           location?: string | null
           name?: string
+          number_of_daigs?: number | null
           type?: string
           updated_at?: string
         }
