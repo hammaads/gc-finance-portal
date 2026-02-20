@@ -346,6 +346,7 @@ export type Database = {
           to_user_id: string | null
           type: string
           updated_at: string
+          void_reason: string | null
         }
         Insert: {
           amount: number
@@ -365,6 +366,7 @@ export type Database = {
           to_user_id?: string | null
           type: string
           updated_at?: string
+          void_reason?: string | null
         }
         Update: {
           amount?: number
@@ -384,6 +386,7 @@ export type Database = {
           to_user_id?: string | null
           type?: string
           updated_at?: string
+          void_reason?: string | null
         }
         Relationships: [
           {
