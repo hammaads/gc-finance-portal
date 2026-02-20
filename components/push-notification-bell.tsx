@@ -15,7 +15,7 @@ import {
   getPushSubscriptionStatus,
 } from "@/lib/actions/push-notifications";
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -46,6 +46,7 @@ export function PushNotificationBell() {
 
   useEffect(() => {
     const isSupported =
+      VAPID_PUBLIC_KEY !== "" &&
       "serviceWorker" in navigator &&
       "PushManager" in window &&
       "Notification" in window;
