@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertCircle, Bell, BellOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createExpenseCategory,
@@ -40,6 +40,11 @@ import {
   deleteDriveTemplate,
 } from "@/lib/actions/budget";
 import { updateReceiptSetting } from "@/lib/actions/receipts";
+import {
+  subscribePush,
+  unsubscribePush,
+  getPushSubscriptionStatus,
+} from "@/lib/actions/push-notifications";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -1437,6 +1442,170 @@ function DeleteTemplateDialog({ template }: { template: Template }) {
   );
 }
 
+// ── Notifications Settings ──
+
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+function NotificationsSettings() {
+  const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [supported, setSupported] = useState(false);
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+
+  useEffect(() => {
+    const isSupported =
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window;
+    setSupported(isSupported);
+
+    if (isSupported) {
+      setPermission(Notification.permission);
+      getPushSubscriptionStatus()
+        .then(setSubscribed)
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  async function handleToggle(checked: boolean) {
+    if (!supported) return;
+    setToggling(true);
+
+    try {
+      if (checked) {
+        const perm = await Notification.requestPermission();
+        setPermission(perm);
+        if (perm !== "granted") {
+          toast.error("Notification permission denied");
+          setToggling(false);
+          return;
+        }
+
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+
+        const json = subscription.toJSON();
+        const formData = new FormData();
+        formData.set("endpoint", json.endpoint!);
+        formData.set("p256dh", json.keys!.p256dh);
+        formData.set("auth", json.keys!.auth);
+
+        const result = await subscribePush(formData);
+        if ("error" in result) {
+          toast.error(result.error);
+        } else {
+          setSubscribed(true);
+          toast.success("Push notifications enabled");
+        }
+      } else {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+        const result = await unsubscribePush();
+        if ("error" in result) {
+          toast.error(result.error);
+        } else {
+          setSubscribed(false);
+          toast.success("Push notifications disabled");
+        }
+      }
+    } catch (err) {
+      console.error("Push toggle error:", err);
+      toast.error("Failed to update notification settings");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  if (!supported) {
+    return (
+      <Card className="p-4">
+        <p className="text-sm text-muted-foreground">
+          Push notifications are not supported in this browser.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {subscribed ? (
+              <Bell className="size-5 text-foreground" />
+            ) : (
+              <BellOff className="size-5 text-muted-foreground" />
+            )}
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Push notifications</Label>
+              <p className="text-xs text-muted-foreground">
+                Receive alerts for new bank donations and daily financial
+                summaries
+              </p>
+            </div>
+          </div>
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Switch
+              checked={subscribed}
+              onCheckedChange={handleToggle}
+              disabled={toggling}
+            />
+          )}
+        </div>
+      </Card>
+      <Card className="p-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Permission status</Label>
+          <p className="text-sm text-muted-foreground">
+            Browser permission:{" "}
+            <Badge
+              variant={
+                permission === "granted"
+                  ? "default"
+                  : permission === "denied"
+                    ? "destructive"
+                    : "outline"
+              }
+            >
+              {permission}
+            </Badge>
+          </p>
+          {permission === "denied" && (
+            <p className="text-xs text-destructive">
+              Notifications are blocked. Please enable them in your browser
+              settings.
+            </p>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main Settings Client ──
 
 export function SettingsClient({
@@ -1474,6 +1643,7 @@ export function SettingsClient({
         <TabsTrigger value="categories">Categories</TabsTrigger>
         <TabsTrigger value="currencies">Currencies</TabsTrigger>
         <TabsTrigger value="templates">Templates</TabsTrigger>
+        <TabsTrigger value="notifications">Notifications</TabsTrigger>
       </TabsList>
 
       {/* ── General Tab ── */}
@@ -1648,6 +1818,13 @@ export function SettingsClient({
             )}
           </TableBody>
         </Table>
+      </TabsContent>
+      {/* ── Notifications Tab ── */}
+      <TabsContent value="notifications" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">Notifications</h2>
+        </div>
+        <NotificationsSettings />
       </TabsContent>
     </Tabs>
   );
