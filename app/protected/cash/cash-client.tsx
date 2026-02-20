@@ -31,10 +31,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRightLeft, Landmark } from "lucide-react";
+import { ArrowRightLeft, Landmark, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
-import { createCashTransfer, createCashDeposit } from "@/lib/actions/cash";
+import { createCashTransfer, createCashDeposit, createBankWithdrawal } from "@/lib/actions/cash";
 
 type CashBalance = {
   id: string | null;
@@ -90,6 +90,11 @@ export function CashClient({
   const [depositFromId, setDepositFromId] = useState("");
   const [depositBankAccountId, setDepositBankAccountId] = useState("");
 
+  // Bank → Volunteer (withdrawal) dialog state
+  const [withdrawalOpen, setWithdrawalOpen] = useState(false);
+  const [withdrawalBankAccountId, setWithdrawalBankAccountId] = useState("");
+  const [withdrawalToId, setWithdrawalToId] = useState("");
+
   // Transfer action
   const [transferState, transferAction, transferPending] = useActionState(
     async (_prev: unknown, formData: FormData) => {
@@ -116,6 +121,19 @@ export function CashClient({
     null,
   );
 
+  // Bank → Volunteer action
+  const [withdrawalState, withdrawalAction, withdrawalPending] = useActionState(
+    async (_prev: unknown, formData: FormData) => {
+      const result = await createBankWithdrawal(formData);
+      if (result.error) return result;
+      toast.success("Bank withdrawal recorded successfully");
+      setWithdrawalOpen(false);
+      router.refresh();
+      return { success: true };
+    },
+    null,
+  );
+
   // Reset transfer form when dialog closes
   useEffect(() => {
     if (!transferOpen) {
@@ -131,6 +149,13 @@ export function CashClient({
       setDepositBankAccountId("");
     }
   }, [depositOpen]);
+
+  useEffect(() => {
+    if (!withdrawalOpen) {
+      setWithdrawalBankAccountId("");
+      setWithdrawalToId("");
+    }
+  }, [withdrawalOpen]);
 
   const formErrors = (state: Record<string, unknown> | null) =>
     ((state as { error?: Record<string, string[]> })?.error ?? {});
@@ -266,6 +291,77 @@ export function CashClient({
                 </DialogClose>
                 <Button type="submit" disabled={transferPending}>
                   {transferPending ? "Submitting..." : "Record Transfer"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bank → Volunteer (Receive from bank) Dialog */}
+        <Dialog open={withdrawalOpen} onOpenChange={setWithdrawalOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline">
+              <Banknote className="mr-2 size-4" />
+              Receive from Bank
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Receive from Bank</DialogTitle>
+            </DialogHeader>
+            <form action={withdrawalAction} className="space-y-4">
+              <input type="hidden" name="bank_account_id" value={withdrawalBankAccountId} />
+              <input type="hidden" name="to_user_id" value={withdrawalToId} />
+              <div className="space-y-2">
+                <Label>Bank Account</Label>
+                <Select value={withdrawalBankAccountId} onValueChange={setWithdrawalBankAccountId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select bank account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankAccounts.map((ba) => (
+                      <SelectItem key={ba.id} value={ba.id}>
+                        {ba.account_name} ({ba.bank_name})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>To Volunteer</Label>
+                <Select value={withdrawalToId} onValueChange={setWithdrawalToId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select volunteer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {volunteers.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="withdrawal-amount">Amount (PKR)</Label>
+                  <Input id="withdrawal-amount" name="amount" type="number" min="0" step="0.01" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="withdrawal-date">Date</Label>
+                  <Input id="withdrawal-date" name="date" type="date" defaultValue={new Date().toISOString().split("T")[0]} required />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="withdrawal-description">Description (optional)</Label>
+                <Textarea id="withdrawal-description" name="description" rows={2} />
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={withdrawalPending}>
+                  {withdrawalPending ? "Submitting..." : "Record"}
                 </Button>
               </DialogFooter>
             </form>

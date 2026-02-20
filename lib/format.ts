@@ -16,6 +16,7 @@ export function ledgerTypeLabel(type: string): string {
     donation_in_kind: "In-Kind",
     cash_transfer: "Cash Transfer",
     cash_deposit: "Cash Deposit",
+    bank_withdrawal: "Bank Withdrawal",
     expense_bank: "Bank Expense",
     expense_cash: "Cash Expense",
   };

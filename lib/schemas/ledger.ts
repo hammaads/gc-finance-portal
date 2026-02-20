@@ -61,6 +61,13 @@ export const cashDepositSchema = baseCashSchema.extend({
   bank_account_id: z.string().uuid("Select a bank account"),
 });
 
+/** Bank → Volunteer (GC-CASH-001) */
+export const bankWithdrawalSchema = baseCashSchema.extend({
+  type: z.literal("bank_withdrawal"),
+  bank_account_id: z.string().uuid("Select a bank account"),
+  to_user_id: z.string().uuid("Select receiving volunteer"),
+});
+
 export const donationInKindSchema = z.object({
   type: z.literal("donation_in_kind"),
   date: z.string().min(1, "Date is required"),

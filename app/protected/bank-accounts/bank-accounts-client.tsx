@@ -357,6 +357,19 @@ export function BankAccountsClient({
       </Dialog>
       )}
 
+      {/* GC-BANK-002: Total across accounts */}
+      {balances.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-4">
+          <p className="text-sm font-medium text-muted-foreground">Total (all accounts, PKR)</p>
+          <p className="text-2xl font-bold">
+            {formatCurrency(
+              balances.reduce((sum, a) => sum + ((a as { balance_pkr?: number }).balance_pkr ?? 0), 0),
+              "Rs",
+            )}
+          </p>
+        </div>
+      )}
+
       {/* Accounts Table */}
       <div className="rounded-md border">
         <Table>

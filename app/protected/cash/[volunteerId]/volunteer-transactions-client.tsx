@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -35,6 +36,8 @@ type Transaction = {
   description: string | null;
   from_user_id: string | null;
   to_user_id: string | null;
+  deleted_at: string | null;
+  item_name: string | null;
   donors: { name: string } | null;
   causes: { name: string } | null;
   expense_categories: { name: string } | null;
@@ -47,6 +50,7 @@ function getDirection(
   entry: Transaction,
   volunteerId: string
 ): "In" | "Out" {
+  if (entry.type === "bank_withdrawal") return "In"; // to_user is volunteer
   if (entry.from_user_id === volunteerId) return "Out";
   return "In";
 }
@@ -56,7 +60,7 @@ function getCounterparty(entry: Transaction, volunteerId: string): string {
     case "donation_cash":
       return entry.donors?.name ?? "-";
     case "expense_cash":
-      return [entry.expense_categories?.name, entry.causes?.name]
+      return entry.item_name ?? [entry.expense_categories?.name, entry.causes?.name]
         .filter(Boolean)
         .join(" - ") || "-";
     case "cash_transfer":
@@ -65,6 +69,8 @@ function getCounterparty(entry: Transaction, volunteerId: string): string {
         : `From ${entry.from_user?.name ?? "Unknown"}`;
     case "cash_deposit":
       return entry.bank_accounts?.account_name ?? "-";
+    case "bank_withdrawal":
+      return `From bank: ${entry.bank_accounts?.account_name ?? "-"}`;
     default:
       return "-";
   }
@@ -134,11 +140,13 @@ function DeleteTransactionDialog({
 interface VolunteerTransactionsClientProps {
   transactions: Transaction[];
   volunteerId: string;
+  showVoided?: boolean;
 }
 
 export function VolunteerTransactionsClient({
   transactions,
   volunteerId,
+  showVoided = false,
 }: VolunteerTransactionsClientProps) {
   return (
     <Table>
@@ -148,7 +156,7 @@ export function VolunteerTransactionsClient({
             <TableHead>Type</TableHead>
             <TableHead className="text-right w-32">PKR Value</TableHead>
             <TableHead>Direction</TableHead>
-            <TableHead>Counterparty</TableHead>
+            <TableHead>Counterparty / Item</TableHead>
             <TableHead className="w-16 text-right">Actions</TableHead>
           </TableRow>
       </TableHeader>
@@ -159,7 +167,7 @@ export function VolunteerTransactionsClient({
               colSpan={6}
               className="text-center text-muted-foreground py-8"
             >
-              No transactions found for this volunteer.
+              {showVoided ? "No voided transactions." : "No transactions found for this volunteer."}
             </TableCell>
           </TableRow>
         ) : (
@@ -167,10 +175,13 @@ export function VolunteerTransactionsClient({
             const direction = getDirection(entry, volunteerId);
             const counterparty = getCounterparty(entry, volunteerId);
             const isIn = direction === "In";
+            const isVoided = !!entry.deleted_at;
+            const isExpense = entry.type === "expense_cash";
             return (
-              <TableRow key={entry.id}>
+              <TableRow key={entry.id} className={isVoided ? "opacity-75" : undefined}>
                 <TableCell>{formatDate(entry.date)}</TableCell>
-                <TableCell>
+                <TableCell className="space-x-1">
+                  {isVoided && <Badge variant="secondary" className="mr-1">VOID</Badge>}
                   <Badge
                     variant={
                       entry.type?.startsWith("donation") ? "default" : "outline"
@@ -184,9 +195,20 @@ export function VolunteerTransactionsClient({
                   {formatCurrency(entry.amount_pkr, "Rs")}
                 </TableCell>
                 <TableCell>{direction}</TableCell>
-                <TableCell>{counterparty}</TableCell>
+                <TableCell>
+                  {isExpense ? (
+                    <Link
+                      href={`/protected/expenses/${entry.id}`}
+                      className="hover:underline text-foreground"
+                    >
+                      {counterparty}
+                    </Link>
+                  ) : (
+                    counterparty
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
-                  <DeleteTransactionDialog entry={entry} volunteerId={volunteerId} />
+                  {!isVoided && <DeleteTransactionDialog entry={entry} volunteerId={volunteerId} />}
                 </TableCell>
               </TableRow>
             );

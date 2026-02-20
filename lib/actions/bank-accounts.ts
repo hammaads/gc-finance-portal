@@ -27,6 +27,7 @@ export type BankAccountBalanceRow = {
   total_deposits: number | null;
   total_withdrawals: number | null;
   balance: number | null;
+  balance_pkr?: number;
   default_cause_id: string | null;
 };
 
@@ -66,7 +67,7 @@ export async function getBankAccountBalances(): Promise<BankAccountBalanceRow[]>
 
       if (entry.type === "donation_bank" || entry.type === "cash_deposit") {
         acc.depositsByAccount.set(id, (acc.depositsByAccount.get(id) ?? 0) + pkr);
-      } else if (entry.type === "expense_bank") {
+      } else if (entry.type === "expense_bank" || entry.type === "bank_withdrawal") {
         acc.withdrawalsByAccount.set(
           id,
           (acc.withdrawalsByAccount.get(id) ?? 0) + pkr,
@@ -108,6 +109,7 @@ export async function getBankAccountBalances(): Promise<BankAccountBalanceRow[]>
       total_deposits: depositsPkr / rateSafe,
       total_withdrawals: withdrawalsPkr / rateSafe,
       balance: balancePkr / rateSafe,
+      balance_pkr: balancePkr,
       default_cause_id: account.default_cause_id ?? null,
     };
   });

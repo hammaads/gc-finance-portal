@@ -1,15 +1,21 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { notFound } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { getVolunteerTransactions, getVolunteerCashBalances } from "@/lib/actions/cash";
 import { formatCurrency } from "@/lib/format";
 import { VolunteerTransactionsClient } from "./volunteer-transactions-client";
 
-async function VolunteerDetailContent({ volunteerId }: { volunteerId: string }) {
-  const data = await getVolunteerTransactions(volunteerId);
+async function VolunteerDetailContent({
+  volunteerId,
+  showVoided,
+}: {
+  volunteerId: string;
+  showVoided: boolean;
+}) {
+  const data = await getVolunteerTransactions(volunteerId, showVoided);
   if (!data) notFound();
 
   const balances = await getVolunteerCashBalances();
@@ -43,10 +49,21 @@ async function VolunteerDetailContent({ volunteerId }: { volunteerId: string }) 
 
       {/* Transaction History */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Transaction History</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Transaction History</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Show voided</span>
+            <Button variant={showVoided ? "default" : "outline"} size="sm" asChild>
+              <Link href={showVoided ? `/protected/cash/${volunteerId}` : `/protected/cash/${volunteerId}?showVoided=true`}>
+                {showVoided ? "On" : "Off"}
+              </Link>
+            </Button>
+          </div>
+        </div>
         <VolunteerTransactionsClient
           transactions={data.transactions}
           volunteerId={volunteerId}
+          showVoided={showVoided}
         />
       </div>
     </div>
@@ -55,13 +72,17 @@ async function VolunteerDetailContent({ volunteerId }: { volunteerId: string }) 
 
 export default async function VolunteerTransactionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ volunteerId: string }>;
+  searchParams: Promise<{ showVoided?: string }>;
 }) {
   const { volunteerId } = await params;
+  const { showVoided: showVoidedParam } = await searchParams;
+  const showVoided = showVoidedParam === "true";
 
   return (
-    <Suspense
+    <Suspense key={String(showVoided)}
       fallback={
         <div className="space-y-6">
           <div className="flex items-center gap-4">
@@ -79,7 +100,7 @@ export default async function VolunteerTransactionsPage({
         </div>
       }
     >
-      <VolunteerDetailContent volunteerId={volunteerId} />
+      <VolunteerDetailContent volunteerId={volunteerId} showVoided={showVoided} />
     </Suspense>
   );
 }

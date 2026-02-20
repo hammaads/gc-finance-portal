@@ -101,14 +101,15 @@ async function AccountStatementContent({
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {entry.description ||
+                      {(entry as { item_name?: string | null }).item_name ??
+                        entry.description ??
                         [
                           entry.donors?.name,
                           entry.causes?.name,
                           entry.expense_categories?.name,
                         ]
                           .filter(Boolean)
-                          .join(" - ") ||
+                          .join(" - ") ??
                         "-"}
                     </TableCell>
                     <TableCell
