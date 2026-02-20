@@ -62,3 +62,53 @@ self.addEventListener("fetch", (event) => {
   // Everything else (API calls, data fetches) — network-only
   // Never cache financial data from Supabase
 });
+
+// ── Push Notifications ──────────────────────────────────────────────
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  try {
+    const payload = event.data.json();
+    const { title, body, url } = payload;
+
+    event.waitUntil(
+      self.registration.showNotification(title || "Grand Citizens Finance", {
+        body: body || "",
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        data: { url: url || "/protected" },
+      }),
+    );
+  } catch {
+    // If payload isn't JSON, show a generic notification
+    event.waitUntil(
+      self.registration.showNotification("Grand Citizens Finance", {
+        body: event.data.text(),
+        icon: "/icons/icon-192x192.png",
+        data: { url: "/protected" },
+      }),
+    );
+  }
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || "/protected";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        // Focus an existing window if one is open
+        for (const client of clients) {
+          if (new URL(client.url).pathname === url && "focus" in client) {
+            return client.focus();
+          }
+        }
+        // Otherwise open a new window
+        return self.clients.openWindow(url);
+      }),
+  );
+});
