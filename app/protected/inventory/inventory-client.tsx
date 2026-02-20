@@ -43,6 +43,8 @@ import {
   transferCustody,
   adjustInventory,
 } from "@/lib/actions/inventory";
+import { getInventoryHistory } from "@/lib/actions/inventory-history";
+import { formatDate } from "@/lib/format";
 
 // ── Types ──
 
@@ -424,6 +426,72 @@ function AdjustDialog({ item }: { item: InventoryItem }) {
   );
 }
 
+// ── History Dialog (GC-INV-003) ──
+
+function HistoryDialog({ item }: { item: InventoryItem }) {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<Awaited<ReturnType<typeof getInventoryHistory>>>([]);
+  const [loading, setLoading] = useState(false);
+
+  async function loadHistory() {
+    setLoading(true);
+    const data = await getInventoryHistory({ ledgerEntryId: item.ledger_entry_id });
+    setEntries(data);
+    setLoading(false);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) loadHistory();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="History">
+          <History className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>History: {item.item_name}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No history recorded yet. Run the inventory_history migration to enable tracking.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Delta</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell className="whitespace-nowrap">{formatDate(e.created_at)}</TableCell>
+                  <TableCell>{e.change_type}</TableCell>
+                  <TableCell className="text-right">{e.delta >= 0 ? "+" : ""}{e.delta}</TableCell>
+                  <TableCell>{e.source}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">{e.notes ?? "-"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main Inventory Client ──
 
 export function InventoryClient({
@@ -534,9 +602,7 @@ export function InventoryClient({
                   </TableCell>
                   <TableCell>{getCustodianDisplay(item)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" title="History (coming soon)" disabled>
-                      <History className="size-4 text-muted-foreground" />
-                    </Button>
+                    <HistoryDialog item={item} />
                     <ConsumeDialog item={item} causes={causes} />
                     <TransferDialog
                       item={item}
