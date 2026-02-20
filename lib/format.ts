@@ -2,13 +2,11 @@ export function formatCurrency(amount: number, symbol = "Rs"): string {
   return `${symbol} ${amount.toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
+import { format as formatDateFns } from "date-fns";
+
+/** User-facing date display: DD-MM-YYYY (GC-UX-002) */
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("en-PK", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatDateFns(new Date(date), "dd-MM-yyyy");
 }
 
 export function ledgerTypeLabel(type: string): string {
