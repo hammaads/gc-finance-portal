@@ -45,7 +45,10 @@ export async function uploadReceipt(
     file_size: fileSize,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to upload receipt:", error.message);
+    return { error: "Failed to save. Please try again." };
+  }
   return { success: true };
 }
 
@@ -66,7 +69,10 @@ export async function deleteReceipt(receiptId: string) {
     .from("receipts")
     .remove([receipt.storage_path]);
 
-  if (storageError) return { error: storageError.message };
+  if (storageError) {
+    console.error("Failed to delete receipt from storage:", storageError.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   // Delete record
   const { error } = await supabase
@@ -74,7 +80,10 @@ export async function deleteReceipt(receiptId: string) {
     .delete()
     .eq("id", receiptId);
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete receipt record:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/expenses");
   return { success: true };
@@ -108,7 +117,10 @@ export async function updateReceiptSetting(required: boolean) {
       { onConflict: "key" },
     );
 
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to update receipt setting:", error.message);
+    return { error: "Failed to save. Please try again." };
+  }
 
   revalidatePath("/protected/settings");
   revalidatePath("/protected/expenses");

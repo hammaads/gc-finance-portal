@@ -38,7 +38,10 @@ export async function createDonation(formData: FormData) {
       .insert({ name: donorName, phone: donorPhone })
       .select("id")
       .single();
-    if (donorError) return { error: { donor_id: [donorError.message] } };
+    if (donorError) {
+      console.error("Failed to create donor:", donorError.message);
+      return { error: { donor_id: ["Failed to save donor. Please try again."] } };
+    }
     donorId = newDonor.id;
   }
 
@@ -103,7 +106,10 @@ export async function createDonation(formData: FormData) {
   }
 
   const { error } = await supabase.from("ledger_entries").insert(insertData);
-  if (error) return { error: { amount: [error.message] } };
+  if (error) {
+    console.error("Failed to create donation:", error.message);
+    return { error: { amount: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/donations");
   revalidatePath("/protected/donors");
@@ -118,7 +124,10 @@ export async function deleteDonation(id: string) {
     .from("ledger_entries")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete donation:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/donations");
   revalidatePath("/protected");

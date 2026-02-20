@@ -138,8 +138,14 @@ export async function createBankAccount(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { account_name: ["Not authenticated"] } };
+
   const { error } = await supabase.from("bank_accounts").insert(parsed.data);
-  if (error) return { error: { account_name: [error.message] } };
+  if (error) {
+    console.error("Failed to create bank account:", error.message);
+    return { error: { account_name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/bank-accounts");
   return { success: true };
@@ -159,8 +165,14 @@ export async function updateBankAccount(formData: FormData) {
 
   const { id, ...rest } = parsed.data;
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { account_name: ["Not authenticated"] } };
+
   const { error } = await supabase.from("bank_accounts").update(rest).eq("id", id!);
-  if (error) return { error: { account_name: [error.message] } };
+  if (error) {
+    console.error("Failed to update bank account:", error.message);
+    return { error: { account_name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/bank-accounts");
   return { success: true };
@@ -168,11 +180,17 @@ export async function updateBankAccount(formData: FormData) {
 
 export async function deleteBankAccount(id: string) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("bank_accounts")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete bank account:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/bank-accounts");
   return { success: true };

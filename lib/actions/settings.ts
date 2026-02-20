@@ -24,12 +24,18 @@ export async function createExpenseCategory(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { data: category, error } = await supabase
     .from("expense_categories")
     .insert({ name: parsed.data.name })
     .select()
     .single();
-  if (error) return { error: { name: [error.message] } };
+  if (error) {
+    console.error("Failed to create expense category:", error.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true, category };
@@ -43,11 +49,17 @@ export async function updateExpenseCategory(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { error } = await supabase
     .from("expense_categories")
     .update({ name: parsed.data.name })
     .eq("id", parsed.data.id!);
-  if (error) return { error: { name: [error.message] } };
+  if (error) {
+    console.error("Failed to update expense category:", error.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true };
@@ -55,11 +67,17 @@ export async function updateExpenseCategory(formData: FormData) {
 
 export async function deleteExpenseCategory(id: string) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("expense_categories")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete expense category:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true };
@@ -90,8 +108,14 @@ export async function createCurrency(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { code: ["Not authenticated"] } };
+
   const { error } = await supabase.from("currencies").insert(parsed.data);
-  if (error) return { error: { code: [error.message] } };
+  if (error) {
+    console.error("Failed to create currency:", error.message);
+    return { error: { code: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true };
@@ -110,8 +134,14 @@ export async function updateCurrency(formData: FormData) {
 
   const { id, ...rest } = parsed.data;
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { code: ["Not authenticated"] } };
+
   const { error } = await supabase.from("currencies").update(rest).eq("id", id!);
-  if (error) return { error: { code: [error.message] } };
+  if (error) {
+    console.error("Failed to update currency:", error.message);
+    return { error: { code: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true };
@@ -119,11 +149,17 @@ export async function updateCurrency(formData: FormData) {
 
 export async function deleteCurrency(id: string) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("currencies")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete currency:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/settings");
   return { success: true };

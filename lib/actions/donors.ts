@@ -47,12 +47,18 @@ export async function createDonor(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
 
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { data, error } = await supabase
     .from("donors")
     .insert(parsed.data)
     .select()
     .single();
-  if (error) return { error: { name: [error.message] } };
+  if (error) {
+    console.error("Failed to create donor:", error.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/donors");
   revalidatePath("/protected/donations");
@@ -70,8 +76,14 @@ export async function updateDonor(formData: FormData) {
 
   const { id, ...rest } = parsed.data;
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
+
   const { error } = await supabase.from("donors").update(rest).eq("id", id!);
-  if (error) return { error: { name: [error.message] } };
+  if (error) {
+    console.error("Failed to update donor:", error.message);
+    return { error: { name: ["Failed to save. Please try again."] } };
+  }
 
   revalidatePath("/protected/donors");
   return { success: true };
@@ -79,11 +91,17 @@ export async function updateDonor(formData: FormData) {
 
 export async function deleteDonor(id: string) {
   const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims?.sub) return { error: "Not authenticated" };
+
   const { error } = await supabase
     .from("donors")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Failed to delete donor:", error.message);
+    return { error: "Failed to delete. Please try again." };
+  }
 
   revalidatePath("/protected/donors");
   return { success: true };
