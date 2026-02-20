@@ -9,10 +9,10 @@ import { getVolunteers } from "@/lib/actions/volunteers";
 import { getItemNameSuggestions } from "@/lib/actions/expenses";
 import { DonationsClient } from "./donations-client";
 
-async function DonationsContent() {
+async function DonationsContent({ showVoided }: { showVoided: boolean }) {
   const [donations, donors, currencies, bankAccounts, causes, volunteers, itemNames] =
     await Promise.all([
-      getDonations(),
+      getDonations({ includeVoided: showVoided }),
       getDonors(),
       getCurrencies(),
       getBankAccounts(),
@@ -30,11 +30,19 @@ async function DonationsContent() {
       causes={causes}
       volunteers={volunteers}
       itemNames={itemNames}
+      showVoided={showVoided}
     />
   );
 }
 
-export default function DonationsPage() {
+export default async function DonationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ showVoided?: string }>;
+}) {
+  const { showVoided } = await searchParams;
+  const includeVoided = showVoided === "1";
+
   return (
     <div className="space-y-6">
       <div>
@@ -44,7 +52,7 @@ export default function DonationsPage() {
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96" />}>
-        <DonationsContent />
+        <DonationsContent showVoided={includeVoided} />
       </Suspense>
     </div>
   );

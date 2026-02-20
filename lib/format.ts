@@ -3,12 +3,12 @@ export function formatCurrency(amount: number, symbol = "Rs"): string {
 }
 
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("en-PK", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return date;
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = parsed.getFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 export function ledgerTypeLabel(type: string): string {
@@ -18,6 +18,7 @@ export function ledgerTypeLabel(type: string): string {
     donation_in_kind: "In-Kind",
     cash_transfer: "Cash Transfer",
     cash_deposit: "Cash Deposit",
+    cash_withdrawal: "Cash Withdrawal",
     expense_bank: "Bank Expense",
     expense_cash: "Cash Expense",
   };

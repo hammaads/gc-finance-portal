@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ type InventoryItem = {
   original_custodian_id: string;
   available_qty: number;
   consumed_qty: number;
+  source_type?: "donated" | "purchased";
 };
 
 interface DriveExpensesClientProps {
@@ -99,6 +101,7 @@ function ConsumeFromInventoryDialog({
   const [open, setOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedItem = inventoryItems.find(
@@ -118,6 +121,7 @@ function ConsumeFromInventoryDialog({
     formData.set("ledger_entry_id", selectedItemId);
     formData.set("cause_id", causeId);
     formData.set("quantity", quantity);
+    formData.set("notes", notes);
 
     const result = await consumeInventory(formData);
     if ("success" in result && result.success) {
@@ -127,6 +131,7 @@ function ConsumeFromInventoryDialog({
       setOpen(false);
       setSelectedItemId("");
       setQuantity("");
+      setNotes("");
       router.refresh();
     } else {
       const errors =
@@ -182,6 +187,16 @@ function ConsumeFromInventoryDialog({
               required
             />
           </div>
+          <div className="space-y-2">
+            <Label>Used for / where it went</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="e.g. Iftaar Drive distribution"
+              required
+            />
+          </div>
           {Number(quantity) > 0 && selectedItem && (
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
               Cost allocated to drive:{" "}
@@ -198,7 +213,7 @@ function ConsumeFromInventoryDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={saving || !selectedItemId || !quantity}
+              disabled={saving || !selectedItemId || !quantity || !notes.trim()}
             >
               {saving ? "Consuming..." : "Consume"}
             </Button>

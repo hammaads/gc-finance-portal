@@ -50,6 +50,9 @@ type Cause = {
   date: string | null;
   location: string | null;
   expected_headcount: number | null;
+  number_of_daigs?: number | null;
+  expected_attendees?: number | null;
+  actual_attendees?: number | null;
 };
 
 type DriveSummary = {
@@ -59,6 +62,9 @@ type DriveSummary = {
   date: string | null;
   location: string | null;
   expected_headcount: number | null;
+  number_of_daigs?: number | null;
+  expected_attendees?: number | null;
+  actual_attendees?: number | null;
   total_budget_pkr: number | null;
   total_spent_pkr: number | null;
   remaining_budget_pkr: number | null;
@@ -582,7 +588,7 @@ function AddCauseDialog({
           </div>
           {type === "drive" && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="add-drive-date">Date</Label>
                   <Input
@@ -592,12 +598,22 @@ function AddCauseDialog({
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="add-drive-daigs">Number of Daigs</Label>
+                  <Input
+                    id="add-drive-daigs"
+                    name="number_of_daigs"
+                    type="number"
+                    min={1}
+                    placeholder="e.g. 10"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="add-drive-headcount">
-                    Expected Headcount
+                    Expected Attendees
                   </Label>
                   <Input
                     id="add-drive-headcount"
-                    name="expected_headcount"
+                    name="expected_attendees"
                     type="number"
                     min={0}
                     placeholder="e.g. 500"
@@ -626,8 +642,8 @@ function AddCauseDialog({
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
                       {headcount > 0
-                        ? `Budget calculated for ${headcount} people`
-                        : "Enter headcount to see calculations"}
+                        ? `Budget calculated for ${headcount} attendees`
+                        : "Enter expected attendees to see calculations"}
                     </p>
 
                     {budgetItems.map((item, index) => (
@@ -732,7 +748,9 @@ function EditCauseDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const isDrive = cause.type === "drive";
-  const [headcount, setHeadcount] = useState(cause.expected_headcount ?? 0);
+  const [headcount, setHeadcount] = useState(
+    cause.expected_attendees ?? cause.expected_headcount ?? 0,
+  );
   const [budgetItems, setBudgetItems] = useState<BudgetItemDraft[]>([]);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [budgetLoading, setBudgetLoading] = useState(false);
@@ -878,7 +896,7 @@ function EditCauseDialog({
     if (!isOpen) {
       setEditingIndex(null);
     } else {
-      setHeadcount(cause.expected_headcount ?? 0);
+      setHeadcount(cause.expected_attendees ?? cause.expected_headcount ?? 0);
     }
     setOpen(isOpen);
   };
@@ -918,7 +936,7 @@ function EditCauseDialog({
           </div>
           {isDrive && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor={`edit-cause-date-${cause.id}`}>Date</Label>
                   <Input
@@ -929,12 +947,25 @@ function EditCauseDialog({
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor={`edit-cause-daigs-${cause.id}`}>
+                    Number of Daigs
+                  </Label>
+                  <Input
+                    id={`edit-cause-daigs-${cause.id}`}
+                    name="number_of_daigs"
+                    type="number"
+                    min={1}
+                    defaultValue={cause.number_of_daigs ?? ""}
+                    placeholder="e.g. 10"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor={`edit-cause-headcount-${cause.id}`}>
-                    Expected Headcount
+                    Expected Attendees
                   </Label>
                   <Input
                     id={`edit-cause-headcount-${cause.id}`}
-                    name="expected_headcount"
+                    name="expected_attendees"
                     type="number"
                     min={0}
                     placeholder="e.g. 500"
@@ -945,6 +976,19 @@ function EditCauseDialog({
                     }}
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`edit-cause-actual-${cause.id}`}>
+                  Actual Attendees
+                </Label>
+                <Input
+                  id={`edit-cause-actual-${cause.id}`}
+                  name="actual_attendees"
+                  type="number"
+                  min={0}
+                  defaultValue={cause.actual_attendees ?? ""}
+                  placeholder="Optional"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor={`edit-cause-location-${cause.id}`}>
@@ -967,7 +1011,7 @@ function EditCauseDialog({
                 ) : budgetItems.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
-                      Changing headcount won&apos;t update the budget. Edit the
+                      Changing expected attendees won&apos;t update the budget. Edit the
                       items below to change amounts and the total.
                     </p>
                     {budgetItems.map((item, index) => (
@@ -1172,10 +1216,16 @@ function DriveCard({
               {cause.location}
             </span>
           )}
-          {cause.expected_headcount && (
+          {cause.number_of_daigs && (
             <span className="flex items-center gap-1">
               <Users className="size-4" />
-              {cause.expected_headcount.toLocaleString()} expected
+              {cause.number_of_daigs.toLocaleString()} daigs
+            </span>
+          )}
+          {(cause.expected_attendees ?? cause.expected_headcount) && (
+            <span className="flex items-center gap-1">
+              <Users className="size-4" />
+              {(cause.expected_attendees ?? cause.expected_headcount)?.toLocaleString()} expected
             </span>
           )}
         </div>

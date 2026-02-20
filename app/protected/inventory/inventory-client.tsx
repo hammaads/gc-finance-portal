@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -12,12 +12,12 @@ import {
 } from "@/components/ui/table";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -29,22 +29,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowRightLeft, Minus, ShoppingCart, Search } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Clock3,
+  Minus,
+  Search,
+  ShoppingCart,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
-  consumeInventory,
-  transferCustody,
   adjustInventory,
+  consumeInventory,
+  getInventoryHistory,
+  transferCustody,
 } from "@/lib/actions/inventory";
-
-// ── Types ──
 
 type InventoryItem = {
   ledger_entry_id: string;
@@ -59,6 +65,19 @@ type InventoryItem = {
   category_id: string;
   available_qty: number;
   consumed_qty: number;
+  item_key: string;
+  source_type: "donated" | "purchased";
+};
+
+type InventoryHistoryEntry = {
+  id: string;
+  created_at: string;
+  change_type: string;
+  source: string;
+  delta_qty: number;
+  notes: string | null;
+  reference_table: string | null;
+  reference_id: string | null;
 };
 
 type CustodianEntry = {
@@ -78,8 +97,6 @@ interface InventoryClientProps {
   volunteers: Volunteer[];
 }
 
-// ── Consume Dialog ──
-
 function ConsumeDialog({
   item,
   causes,
@@ -91,9 +108,10 @@ function ConsumeDialog({
   const [open, setOpen] = useState(false);
   const [causeId, setCauseId] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const unitPricePkr = Number(item.amount_pkr) / Number(item.purchased_qty);
+  const unitPricePkr = Number(item.amount_pkr) / Math.max(Number(item.purchased_qty), 1);
   const allocatedCost = (Number(quantity) || 0) * unitPricePkr;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,15 +122,15 @@ function ConsumeDialog({
     formData.set("ledger_entry_id", item.ledger_entry_id);
     formData.set("cause_id", causeId);
     formData.set("quantity", quantity);
+    formData.set("notes", notes);
 
     const result = await consumeInventory(formData);
     if ("success" in result && result.success) {
-      toast.success(
-        `${quantity} × ${item.item_name} consumed`,
-      );
+      toast.success(`${quantity} x ${item.item_name} consumed`);
       setOpen(false);
       setCauseId("");
       setQuantity("");
+      setNotes("");
       router.refresh();
     } else {
       const errors =
@@ -138,6 +156,9 @@ function ConsumeDialog({
           <DialogTitle>Consume: {item.item_name}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Source: {item.source_type === "donated" ? "In-kind donation" : "Purchased"}
+          </p>
           <div className="space-y-2">
             <Label>Drive</Label>
             <Select value={causeId} onValueChange={setCauseId}>
@@ -154,9 +175,7 @@ function ConsumeDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>
-              Quantity (max {Number(item.available_qty)})
-            </Label>
+            <Label>Quantity (max {Number(item.available_qty)})</Label>
             <Input
               type="number"
               min={1}
@@ -166,12 +185,20 @@ function ConsumeDialog({
               required
             />
           </div>
+          <div className="space-y-2">
+            <Label>Used for / where it went</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              placeholder="e.g. Iftaar Drive - Sector 11 distribution"
+              required
+            />
+          </div>
           {Number(quantity) > 0 && (
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
               Cost allocated to drive:{" "}
-              <span className="font-semibold">
-                {formatCurrency(allocatedCost)}
-              </span>
+              <span className="font-semibold">{formatCurrency(allocatedCost)}</span>
             </div>
           )}
           <DialogFooter>
@@ -180,10 +207,7 @@ function ConsumeDialog({
                 Cancel
               </Button>
             </DialogClose>
-            <Button
-              type="submit"
-              disabled={saving || !causeId || !quantity}
-            >
+            <Button type="submit" disabled={saving || !causeId || !quantity || !notes.trim()}>
               {saving ? "Consuming..." : "Consume"}
             </Button>
           </DialogFooter>
@@ -192,8 +216,6 @@ function ConsumeDialog({
     </Dialog>
   );
 }
-
-// ── Transfer Dialog ──
 
 function TransferDialog({
   item,
@@ -260,25 +282,16 @@ function TransferDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>From Volunteer</Label>
-            <Select
-              value={fromVolunteerId}
-              onValueChange={setFromVolunteerId}
-            >
+            <Select value={fromVolunteerId} onValueChange={setFromVolunteerId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select holder" />
               </SelectTrigger>
               <SelectContent>
                 {custodians.map((c) => {
-                  const profile = volunteers.find(
-                    (p) => p.id === c.volunteer_id,
-                  );
+                  const profile = volunteers.find((p) => p.id === c.volunteer_id);
                   return (
-                    <SelectItem
-                      key={c.volunteer_id}
-                      value={c.volunteer_id}
-                    >
-                      {profile?.name ?? "Unknown"} (
-                      {Number(c.qty_held)} held)
+                    <SelectItem key={c.volunteer_id} value={c.volunteer_id}>
+                      {profile?.name ?? "Unknown"} ({Number(c.qty_held)} held)
                     </SelectItem>
                   );
                 })}
@@ -287,10 +300,7 @@ function TransferDialog({
           </div>
           <div className="space-y-2">
             <Label>To Volunteer</Label>
-            <Select
-              value={toVolunteerId}
-              onValueChange={setToVolunteerId}
-            >
+            <Select value={toVolunteerId} onValueChange={setToVolunteerId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select recipient" />
               </SelectTrigger>
@@ -324,12 +334,7 @@ function TransferDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={
-                saving ||
-                !fromVolunteerId ||
-                !toVolunteerId ||
-                !quantity
-              }
+              disabled={saving || !fromVolunteerId || !toVolunteerId || !quantity}
             >
               {saving ? "Transferring..." : "Transfer"}
             </Button>
@@ -339,8 +344,6 @@ function TransferDialog({
     </Dialog>
   );
 }
-
-// ── Adjust Dialog ──
 
 function AdjustDialog({ item }: { item: InventoryItem }) {
   const router = useRouter();
@@ -352,9 +355,7 @@ function AdjustDialog({ item }: { item: InventoryItem }) {
     e.preventDefault();
     setSaving(true);
 
-    const totalNewQty =
-      Number(newQty) + Number(item.consumed_qty);
-
+    const totalNewQty = Number(newQty) + Number(item.consumed_qty);
     const formData = new FormData();
     formData.set("ledger_entry_id", item.ledger_entry_id);
     formData.set("new_quantity", String(totalNewQty));
@@ -424,7 +425,77 @@ function AdjustDialog({ item }: { item: InventoryItem }) {
   );
 }
 
-// ── Main Inventory Client ──
+function HistoryDialog({ item }: { item: InventoryItem }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [entries, setEntries] = useState<InventoryHistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let active = true;
+    setLoading(true);
+    getInventoryHistory(item.item_key)
+      .then((data) => {
+        if (active) {
+          setEntries((data ?? []) as InventoryHistoryEntry[]);
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, item.item_key]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" title="History">
+          <Clock3 className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>History: {item.item_name}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading history...</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No history yet for this item.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {entries.map((entry) => (
+              <div key={entry.id} className="rounded-md border p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium capitalize">
+                    {entry.change_type.replace("_", " ")}
+                  </p>
+                  <p
+                    className={`font-medium ${
+                      entry.delta_qty >= 0 ? "text-emerald-600" : "text-destructive"
+                    }`}
+                  >
+                    {entry.delta_qty >= 0 ? "+" : ""}
+                    {entry.delta_qty}
+                  </p>
+                </div>
+                <p className="text-muted-foreground">
+                  {formatDate(entry.created_at)} • {entry.source}
+                </p>
+                {entry.notes && <p className="mt-1">{entry.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function InventoryClient({
   inventoryItems,
@@ -445,18 +516,14 @@ export function InventoryClient({
       (c) => c.ledger_entry_id === item.ledger_entry_id,
     );
     if (custodians.length === 0) {
-      const p = volunteers.find(
-        (pr) => pr.id === item.original_custodian_id,
-      );
+      const p = volunteers.find((pr) => pr.id === item.original_custodian_id);
       return p?.name ?? "-";
     }
     if (custodians.length === 1) {
-      const p = volunteers.find(
-        (pr) => pr.id === custodians[0].volunteer_id,
-      );
+      const p = volunteers.find((pr) => pr.id === custodians[0].volunteer_id);
       return p?.name ?? "-";
     }
-    // Multiple custodians
+
     const names = custodians.map((c) => {
       const p = volunteers.find((pr) => pr.id === c.volunteer_id);
       return `${p?.name ?? "?"}: ${Number(c.qty_held)}`;
@@ -480,9 +547,7 @@ export function InventoryClient({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">
-          All Items ({inventoryItems.length})
-        </h2>
+        <h2 className="text-lg font-medium">All Items ({inventoryItems.length})</h2>
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
@@ -498,21 +563,15 @@ export function InventoryClient({
           <TableRow>
             <TableHead>Item Name</TableHead>
             <TableHead className="text-right">Available</TableHead>
-            <TableHead className="text-right">Purchased</TableHead>
             <TableHead className="text-right">Unit Price</TableHead>
-            <TableHead className="text-right">Total Value (PKR)</TableHead>
             <TableHead>Custodian</TableHead>
-            <TableHead>Purchase Date</TableHead>
-            <TableHead className="w-32 text-right">Actions</TableHead>
+            <TableHead className="w-40 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.length === 0 ? (
             <TableRow>
-              <TableCell
-                colSpan={8}
-                className="text-center text-muted-foreground"
-              >
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 {search
                   ? "No items match your search."
                   : "No inventory items yet. Add a general expense to get started."}
@@ -520,34 +579,24 @@ export function InventoryClient({
             </TableRow>
           ) : (
             filtered.map((item) => {
-              const totalValuePkr =
-                Number(item.available_qty) *
-                (Number(item.amount_pkr) / Number(item.purchased_qty));
               const custodians = custodianData.filter(
                 (c) => c.ledger_entry_id === item.ledger_entry_id,
               );
-
               return (
                 <TableRow key={item.ledger_entry_id}>
                   <TableCell className="font-medium">
-                    {item.item_name}
+                    <div className="flex items-center gap-2">
+                      <span>{item.item_name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({item.source_type === "donated" ? "Donation" : "Purchased"})
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    {Number(item.available_qty)}
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {Number(item.purchased_qty)}
-                  </TableCell>
+                  <TableCell className="text-right">{Number(item.available_qty)}</TableCell>
                   <TableCell className="text-right">
                     {formatCurrency(Number(item.unit_price))}
                   </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(totalValuePkr)}
-                  </TableCell>
                   <TableCell>{getCustodianDisplay(item)}</TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {formatDate(item.purchase_date)}
-                  </TableCell>
                   <TableCell className="text-right">
                     <ConsumeDialog item={item} causes={causes} />
                     <TransferDialog
@@ -556,6 +605,7 @@ export function InventoryClient({
                       volunteers={volunteers}
                     />
                     <AdjustDialog item={item} />
+                    <HistoryDialog item={item} />
                   </TableCell>
                 </TableRow>
               );

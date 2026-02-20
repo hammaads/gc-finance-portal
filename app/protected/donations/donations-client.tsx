@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -36,11 +38,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Trash2, CalendarIcon, Check, Loader2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  CalendarIcon,
+  Check,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { createDonation, deleteDonation } from "@/lib/actions/donations";
+import {
+  createDonation,
+  voidDonation,
+  restoreDonation,
+} from "@/lib/actions/donations";
 import { DonorAutocomplete } from "@/components/ui/donor-combobox";
 import { VolunteerCombobox } from "@/components/ui/volunteer-combobox";
 import { cn } from "@/lib/utils";
@@ -61,6 +74,10 @@ type Donation = {
   to_user_id: string | null;
   item_name: string | null;
   quantity: number | null;
+  deleted_at: string | null;
+  void_reason: string | null;
+  voided_at: string | null;
+  restored_at: string | null;
   currencies: { code: string; symbol: string } | null;
   donors: { name: string } | null;
   causes: { name: string } | null;
@@ -112,26 +129,34 @@ interface DonationsClientProps {
   causes: Cause[];
   volunteers: Volunteer[];
   itemNames: string[];
+  showVoided: boolean;
 }
 
 // ── Delete Donation Dialog ──
 
-function DeleteDonationDialog({ donation }: { donation: Donation }) {
+function VoidDonationDialog({ donation }: { donation: Donation }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deleteDonation(donation.id);
+  async function handleVoid() {
+    if (!reason.trim()) {
+      toast.error("Void reason is required");
+      return;
+    }
+    setSubmitting(true);
+    const result = await voidDonation(donation.id, reason);
     if ("success" in result && result.success) {
-      toast.success("Donation deleted");
+      toast.success("Donation voided");
       setOpen(false);
+      setReason("");
       router.refresh();
     } else {
-      toast.error("Failed to delete donation");
+      const message = "error" in result ? result.error : "Failed to void donation";
+      toast.error(typeof message === "string" ? message : "Failed to void donation");
     }
-    setDeleting(false);
+    setSubmitting(false);
   }
 
   return (
@@ -143,15 +168,26 @@ function DeleteDonationDialog({ donation }: { donation: Donation }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Donation</DialogTitle>
+          <DialogTitle>Void Donation</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete this donation of{" "}
+          This donation will be excluded from totals. Please provide a reason.
+        </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Reason</label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Explain why this donation is being voided"
+          />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Donation amount:{" "}
           <span className="font-medium text-foreground">
             {donation.currencies?.symbol ?? ""}{" "}
             {donation.amount.toLocaleString()}
           </span>
-          ? This action cannot be undone.
         </p>
         <DialogFooter>
           <DialogClose asChild>
@@ -161,10 +197,67 @@ function DeleteDonationDialog({ donation }: { donation: Donation }) {
           </DialogClose>
           <Button
             variant="destructive"
-            onClick={handleDelete}
-            disabled={deleting}
+            onClick={handleVoid}
+            disabled={submitting || !reason.trim()}
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {submitting ? "Voiding..." : "Void Donation"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RestoreDonationDialog({ donation }: { donation: Donation }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  async function handleRestore() {
+    setRestoring(true);
+    const result = await restoreDonation(donation.id);
+    if ("success" in result && result.success) {
+      toast.success("Donation restored");
+      setOpen(false);
+      router.refresh();
+    } else {
+      const message =
+        "error" in result ? result.error : "Failed to restore donation";
+      toast.error(
+        typeof message === "string" ? message : "Failed to restore donation",
+      );
+    }
+    setRestoring(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <RotateCcw className="size-4 text-emerald-600" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Restore Donation</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Restore this voided donation back into active totals?
+        </p>
+        {donation.void_reason && (
+          <p className="rounded-md bg-muted p-2 text-sm">
+            <span className="font-medium">Void reason: </span>
+            {donation.void_reason}
+          </p>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button onClick={handleRestore} disabled={restoring}>
+            {restoring ? "Restoring..." : "Restore"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -637,19 +730,40 @@ export function DonationsClient({
   causes,
   volunteers,
   itemNames,
+  showVoided,
 }: DonationsClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function handleShowVoidedChange(checked: boolean) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (checked) {
+      next.set("showVoided", "1");
+    } else {
+      next.delete("showVoided");
+    }
+    const query = next.toString();
+    router.push(query ? `?${query}` : "/protected/donations");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">All Donations</h2>
-        <AddDonationDialog
-          donors={donors}
-          currencies={currencies}
-          bankAccounts={bankAccounts}
-          causes={causes}
-          volunteers={volunteers}
-          itemNames={itemNames}
-        />
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Switch checked={showVoided} onCheckedChange={handleShowVoidedChange} />
+            Show voided
+          </label>
+          <AddDonationDialog
+            donors={donors}
+            currencies={currencies}
+            bankAccounts={bankAccounts}
+            causes={causes}
+            volunteers={volunteers}
+            itemNames={itemNames}
+          />
+        </div>
       </div>
       <Table>
         <TableHeader>
@@ -662,6 +776,7 @@ export function DonationsClient({
             <TableHead>Method</TableHead>
             <TableHead>Cause</TableHead>
             <TableHead>Recipient</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead className="w-16 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -669,15 +784,18 @@ export function DonationsClient({
           {donations.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={9}
+                colSpan={10}
                 className="text-center text-muted-foreground"
               >
-                No donations yet. Add one to get started.
+                {showVoided
+                  ? "No donations found."
+                  : "No active donations yet. Add one to get started."}
               </TableCell>
             </TableRow>
           ) : (
             donations.map((donation) => {
               const isInKind = donation.type === "donation_in_kind";
+              const isVoided = !!donation.deleted_at;
               const pkrValue = donation.amount * donation.exchange_rate_to_pkr;
               const methodLabel =
                 donation.type === "donation_bank" ? "Bank" : donation.type === "donation_cash" ? "Cash" : "In-Kind";
@@ -688,9 +806,16 @@ export function DonationsClient({
                   : donation.to_user?.name ?? "-";
 
               return (
-                <TableRow key={donation.id}>
+                <TableRow key={donation.id} className={isVoided ? "opacity-70" : undefined}>
                   <TableCell>{formatDate(donation.date)}</TableCell>
-                  <TableCell>{donation.donors?.name ?? "-"}</TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/protected/donations/${donation.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {donation.donors?.name ?? "-"}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-right">
                     {isInKind
                       ? `${donation.item_name} ×${donation.quantity}`
@@ -713,8 +838,26 @@ export function DonationsClient({
                   </TableCell>
                   <TableCell>{donation.causes?.name ?? "-"}</TableCell>
                   <TableCell>{recipient}</TableCell>
+                  <TableCell>
+                    {isVoided ? (
+                      <div className="space-y-1">
+                        <Badge variant="destructive">VOID</Badge>
+                        {donation.void_reason && (
+                          <p className="max-w-48 truncate text-xs text-muted-foreground">
+                            {donation.void_reason}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">Active</Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <DeleteDonationDialog donation={donation} />
+                    {isVoided ? (
+                      <RestoreDonationDialog donation={donation} />
+                    ) : (
+                      <VoidDonationDialog donation={donation} />
+                    )}
                   </TableCell>
                 </TableRow>
               );

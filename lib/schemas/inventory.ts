@@ -4,6 +4,7 @@ export const consumeInventorySchema = z.object({
   ledger_entry_id: z.string().uuid("Select an inventory item"),
   cause_id: z.string().uuid("Select a drive"),
   quantity: z.coerce.number().positive("Quantity must be positive"),
+  notes: z.string().trim().min(1, "Used for / where it went is required"),
 });
 
 export const custodyTransferSchema = z.object({

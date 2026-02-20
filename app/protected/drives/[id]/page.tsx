@@ -71,10 +71,16 @@ async function DriveDetailContent({ id }: { id: string }) {
                 {cause.location}
               </span>
             )}
-            {cause.expected_headcount && (
+            {cause.number_of_daigs && (
               <span className="flex items-center gap-1">
                 <Users className="size-4" />
-                {cause.expected_headcount.toLocaleString()} expected
+                {cause.number_of_daigs.toLocaleString()} daigs
+              </span>
+            )}
+            {(cause.expected_attendees ?? cause.expected_headcount) && (
+              <span className="flex items-center gap-1">
+                <Users className="size-4" />
+                {(cause.expected_attendees ?? cause.expected_headcount).toLocaleString()} expected
               </span>
             )}
           </div>
