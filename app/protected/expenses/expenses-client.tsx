@@ -211,6 +211,7 @@ function ReceiptUpload({
             key={i}
             className="relative size-14 overflow-hidden rounded-md border bg-muted"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={URL.createObjectURL(file)}
               alt={file.name}
