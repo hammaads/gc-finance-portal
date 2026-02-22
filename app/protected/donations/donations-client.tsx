@@ -806,7 +806,20 @@ export function DonationsClient({
                   : donation.to_user?.name ?? "-";
 
               return (
-                <TableRow key={donation.id} className={isVoided ? "opacity-70" : undefined}>
+                <TableRow
+                  key={donation.id}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`View donation from ${donation.donors?.name ?? "unknown donor"}`}
+                  onClick={() => router.push(`/protected/donations/${donation.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/protected/donations/${donation.id}`);
+                    }
+                  }}
+                  className={cn("cursor-pointer", isVoided ? "opacity-70" : undefined)}
+                >
                   <TableCell>{formatDate(donation.date)}</TableCell>
                   <TableCell>
                     <Link
@@ -852,7 +865,11 @@ export function DonationsClient({
                       <Badge variant="outline">Active</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell
+                    className="text-right"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
                     {isVoided ? (
                       <RestoreDonationDialog donation={donation} />
                     ) : (
