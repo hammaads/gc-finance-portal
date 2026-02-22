@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -47,9 +47,12 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
   adjustInventory,
+  adjustInventoryMerged,
   consumeInventory,
+  consumeInventoryMerged,
   getInventoryHistory,
   transferCustody,
+  transferCustodyMerged,
 } from "@/lib/actions/inventory";
 
 type InventoryItem = {
@@ -89,6 +92,8 @@ type CustodianEntry = {
 
 type Cause = { id: string; name: string };
 type Volunteer = { id: string; name: string };
+type DisplayCustodian = { volunteer_id: string; qty_held: number };
+type InventoryDisplayItem = InventoryItem & { ledger_entry_ids: string[] };
 
 interface InventoryClientProps {
   inventoryItems: InventoryItem[];
@@ -101,7 +106,7 @@ function ConsumeDialog({
   item,
   causes,
 }: {
-  item: InventoryItem;
+  item: InventoryDisplayItem;
   causes: Cause[];
 }) {
   const router = useRouter();
@@ -119,12 +124,19 @@ function ConsumeDialog({
     setSaving(true);
 
     const formData = new FormData();
-    formData.set("ledger_entry_id", item.ledger_entry_id);
+    if (item.ledger_entry_ids.length > 1) {
+      item.ledger_entry_ids.forEach((id) => formData.append("ledger_entry_ids", id));
+    } else {
+      formData.set("ledger_entry_id", item.ledger_entry_id);
+    }
     formData.set("cause_id", causeId);
     formData.set("quantity", quantity);
     formData.set("notes", notes);
 
-    const result = await consumeInventory(formData);
+    const result =
+      item.ledger_entry_ids.length > 1
+        ? await consumeInventoryMerged(formData)
+        : await consumeInventory(formData);
     if ("success" in result && result.success) {
       toast.success(`${quantity} x ${item.item_name} consumed`);
       setOpen(false);
@@ -222,8 +234,8 @@ function TransferDialog({
   custodians,
   volunteers,
 }: {
-  item: InventoryItem;
-  custodians: CustodianEntry[];
+  item: InventoryDisplayItem;
+  custodians: DisplayCustodian[];
   volunteers: Volunteer[];
 }) {
   const router = useRouter();
@@ -243,12 +255,19 @@ function TransferDialog({
     setSaving(true);
 
     const formData = new FormData();
-    formData.set("ledger_entry_id", item.ledger_entry_id);
+    if (item.ledger_entry_ids.length > 1) {
+      item.ledger_entry_ids.forEach((id) => formData.append("ledger_entry_ids", id));
+    } else {
+      formData.set("ledger_entry_id", item.ledger_entry_id);
+    }
     formData.set("from_volunteer_id", fromVolunteerId);
     formData.set("to_volunteer_id", toVolunteerId);
     formData.set("quantity", quantity);
 
-    const result = await transferCustody(formData);
+    const result =
+      item.ledger_entry_ids.length > 1
+        ? await transferCustodyMerged(formData)
+        : await transferCustody(formData);
     if ("success" in result && result.success) {
       toast.success("Custody transferred");
       setOpen(false);
@@ -345,7 +364,7 @@ function TransferDialog({
   );
 }
 
-function AdjustDialog({ item }: { item: InventoryItem }) {
+function AdjustDialog({ item }: { item: InventoryDisplayItem }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [newQty, setNewQty] = useState(String(item.available_qty));
@@ -357,10 +376,17 @@ function AdjustDialog({ item }: { item: InventoryItem }) {
 
     const totalNewQty = Number(newQty) + Number(item.consumed_qty);
     const formData = new FormData();
-    formData.set("ledger_entry_id", item.ledger_entry_id);
+    if (item.ledger_entry_ids.length > 1) {
+      item.ledger_entry_ids.forEach((id) => formData.append("ledger_entry_ids", id));
+    } else {
+      formData.set("ledger_entry_id", item.ledger_entry_id);
+    }
     formData.set("new_quantity", String(totalNewQty));
 
-    const result = await adjustInventory(formData);
+    const result =
+      item.ledger_entry_ids.length > 1
+        ? await adjustInventoryMerged(formData)
+        : await adjustInventory(formData);
     if ("success" in result && result.success) {
       toast.success("Inventory adjusted");
       setOpen(false);
@@ -505,26 +531,66 @@ export function InventoryClient({
 }: InventoryClientProps) {
   const [search, setSearch] = useState("");
 
+  const groupedItems = useMemo(() => {
+    const grouped = new Map<string, (InventoryItem & { ledger_entry_ids: string[] })>();
+    for (const item of inventoryItems) {
+      const normalizedName = item.item_name.trim().toLowerCase().replace(/\s+/g, " ");
+      const groupKey = `${normalizedName}::${item.source_type}`;
+      const existing = grouped.get(groupKey);
+
+      if (!existing) {
+        grouped.set(groupKey, { ...item, ledger_entry_ids: [item.ledger_entry_id] });
+        continue;
+      }
+
+      existing.purchased_qty = Number(existing.purchased_qty) + Number(item.purchased_qty);
+      existing.available_qty = Number(existing.available_qty) + Number(item.available_qty);
+      existing.consumed_qty = Number(existing.consumed_qty) + Number(item.consumed_qty);
+      existing.amount_pkr = Number(existing.amount_pkr) + Number(item.amount_pkr);
+      existing.ledger_entry_ids.push(item.ledger_entry_id);
+      existing.unit_price = Number(existing.amount_pkr) / Math.max(Number(existing.purchased_qty), 1);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([groupKey, item]) => ({ ...item, group_key: groupKey }))
+      .sort((a, b) => a.item_name.localeCompare(b.item_name));
+  }, [inventoryItems]);
+
   const filtered = search
-    ? inventoryItems.filter((item) =>
+    ? groupedItems.filter((item) =>
         item.item_name.toLowerCase().includes(search.toLowerCase()),
       )
-    : inventoryItems;
+    : groupedItems;
 
-  function getCustodianDisplay(item: InventoryItem) {
+  function getUniqueCustodians(item: InventoryDisplayItem): DisplayCustodian[] {
     const custodians = custodianData.filter(
-      (c) => c.ledger_entry_id === item.ledger_entry_id,
+      (c) => item.ledger_entry_ids.includes(c.ledger_entry_id),
     );
-    if (custodians.length === 0) {
+    const byVolunteer = new Map<string, number>();
+    for (const c of custodians) {
+      byVolunteer.set(
+        c.volunteer_id,
+        (byVolunteer.get(c.volunteer_id) ?? 0) + Number(c.qty_held),
+      );
+    }
+    const uniqueCustodians = Array.from(byVolunteer.entries()).map(
+      ([volunteerId, qtyHeld]) => ({ volunteer_id: volunteerId, qty_held: qtyHeld }),
+    );
+    return uniqueCustodians;
+  }
+
+  function getCustodianDisplay(item: InventoryDisplayItem) {
+    const uniqueCustodians = getUniqueCustodians(item);
+    if (uniqueCustodians.length === 0) {
       const p = volunteers.find((pr) => pr.id === item.original_custodian_id);
       return p?.name ?? "-";
     }
-    if (custodians.length === 1) {
-      const p = volunteers.find((pr) => pr.id === custodians[0].volunteer_id);
+    if (uniqueCustodians.length === 1) {
+      const p = volunteers.find((pr) => pr.id === uniqueCustodians[0].volunteer_id);
       return p?.name ?? "-";
     }
 
-    const names = custodians.map((c) => {
+    const names = uniqueCustodians.map((c) => {
       const p = volunteers.find((pr) => pr.id === c.volunteer_id);
       return `${p?.name ?? "?"}: ${Number(c.qty_held)}`;
     });
@@ -532,7 +598,7 @@ export function InventoryClient({
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger className="cursor-help underline decoration-dotted">
-            {custodians.length} holders
+            {uniqueCustodians.length} holders
           </TooltipTrigger>
           <TooltipContent>
             {names.map((n, i) => (
@@ -547,7 +613,7 @@ export function InventoryClient({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">All Items ({inventoryItems.length})</h2>
+        <h2 className="text-lg font-medium">All Items ({groupedItems.length})</h2>
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
@@ -579,17 +645,21 @@ export function InventoryClient({
             </TableRow>
           ) : (
             filtered.map((item) => {
-              const custodians = custodianData.filter(
-                (c) => c.ledger_entry_id === item.ledger_entry_id,
-              );
+              const custodians = getUniqueCustodians(item);
+              const hasMultipleLots = item.ledger_entry_ids.length > 1;
               return (
-                <TableRow key={item.ledger_entry_id}>
+                <TableRow key={item.group_key}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <span>{item.item_name}</span>
                       <span className="text-xs text-muted-foreground">
                         ({item.source_type === "donated" ? "Donation" : "Purchased"})
                       </span>
+                      {hasMultipleLots && (
+                        <span className="text-xs text-muted-foreground">
+                          ({item.ledger_entry_ids.length} lots merged)
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">{Number(item.available_qty)}</TableCell>
