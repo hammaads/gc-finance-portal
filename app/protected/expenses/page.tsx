@@ -8,7 +8,7 @@ import { getVolunteers } from "@/lib/actions/volunteers";
 import { getReceiptSetting } from "@/lib/actions/receipts";
 import { ExpensesClient } from "./expenses-client";
 
-async function ExpensesContent() {
+async function ExpensesContent({ showVoided }: { showVoided: boolean }) {
   const [
     expenses,
     categories,
@@ -19,7 +19,7 @@ async function ExpensesContent() {
     itemNames,
     receiptRequired,
   ] = await Promise.all([
-    getExpenses(),
+    getExpenses({ includeVoided: showVoided }),
     getExpenseCategories(),
     getCurrencies(),
     getBankAccounts(),
@@ -39,11 +39,19 @@ async function ExpensesContent() {
       volunteers={volunteers}
       itemNames={itemNames}
       receiptRequired={receiptRequired}
+      showVoided={showVoided}
     />
   );
 }
 
-export default function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ showVoided?: string }>;
+}) {
+  const { showVoided } = await searchParams;
+  const includeVoided = showVoided === "1";
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,7 +61,7 @@ export default function ExpensesPage() {
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96" />}>
-        <ExpensesContent />
+        <ExpensesContent showVoided={includeVoided} />
       </Suspense>
     </div>
   );

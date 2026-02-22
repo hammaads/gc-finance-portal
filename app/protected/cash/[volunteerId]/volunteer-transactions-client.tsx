@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, ledgerTypeLabel } from "@/lib/format";
@@ -65,6 +66,8 @@ function getCounterparty(entry: Transaction, volunteerId: string): string {
         : `From ${entry.from_user?.name ?? "Unknown"}`;
     case "cash_deposit":
       return entry.bank_accounts?.account_name ?? "-";
+    case "cash_withdrawal":
+      return entry.bank_accounts?.account_name ?? "-";
     default:
       return "-";
   }
@@ -80,16 +83,22 @@ function DeleteTransactionDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
 
   async function handleDelete() {
+    if (!reason.trim()) {
+      toast.error("Void reason is required");
+      return;
+    }
     setDeleting(true);
-    const result = await deleteLedgerEntry(entry.id, volunteerId);
+    const result = await deleteLedgerEntry(entry.id, volunteerId, reason);
     if ("success" in result && result.success) {
-      toast.success("Transaction deleted");
+      toast.success("Transaction voided");
       setOpen(false);
+      setReason("");
       router.refresh();
     } else {
-      toast.error("Failed to delete transaction");
+      toast.error("Failed to void transaction");
     }
     setDeleting(false);
   }
@@ -103,14 +112,25 @@ function DeleteTransactionDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Transaction</DialogTitle>
+          <DialogTitle>Void Transaction</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete this {ledgerTypeLabel(entry.type).toLowerCase()} of{" "}
+          This {ledgerTypeLabel(entry.type).toLowerCase()} will be excluded from totals.
+        </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Reason</label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Explain why this transaction is being voided"
+          />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Amount:{" "}
           <span className="font-medium text-foreground">
             {formatCurrency(entry.amount_pkr, "Rs")}
           </span>
-          ? This action cannot be undone.
         </p>
         <DialogFooter>
           <DialogClose asChild>
@@ -121,9 +141,9 @@ function DeleteTransactionDialog({
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleting || !reason.trim()}
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {deleting ? "Voiding..." : "Void"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -25,6 +25,7 @@ import { AddExpenseDialog } from "./expenses/expenses-client";
 
 type BankBalance = {
   balance?: number | null;
+  balance_pkr?: number | null;
   currency_code?: string | null;
   currency_symbol?: string | null;
 };
@@ -124,15 +125,48 @@ export function DashboardContent({
   itemNames,
   receiptRequired,
 }: DashboardContentProps) {
-  const totalBankFunds = bankBalances.reduce(
-    (sum: number, b: BankBalance) => sum + (b.balance ?? 0) * (b.currency_code === "PKR" ? 1 : 1),
-    0
-  );
-  const totalCashFunds = cashBalances.reduce(
+  const totalCashFundsPkr = cashBalances.reduce(
     (sum: number, c: CashBalance) => sum + (c.balance_pkr ?? 0),
     0
   );
-  const totalFunds = totalBankFunds + totalCashFunds;
+
+  const baseCurrency =
+    currencies.find((c: Currency) => c.is_base) ??
+    currencies.find((c: Currency) => c.code === "PKR") ??
+    currencies[0];
+  const baseRate =
+    baseCurrency && baseCurrency.exchange_rate_to_pkr > 0
+      ? baseCurrency.exchange_rate_to_pkr
+      : 1;
+  const totalCashInBaseCurrency = totalCashFundsPkr / baseRate;
+
+  type CurrencyBreakdown = {
+    code: string;
+    symbol: string;
+    bank: number;
+    cash: number;
+  };
+  const fundsByCurrency = new Map<string, CurrencyBreakdown>();
+
+  for (const bankBalance of bankBalances) {
+    const code = bankBalance.currency_code ?? "UNKNOWN";
+    const symbol = bankBalance.currency_symbol ?? code;
+    const current = fundsByCurrency.get(code) ?? { code, symbol, bank: 0, cash: 0 };
+    current.bank += Number(bankBalance.balance ?? 0);
+    fundsByCurrency.set(code, current);
+  }
+
+  if (baseCurrency) {
+    const code = baseCurrency.code;
+    const symbol = baseCurrency.symbol;
+    const current = fundsByCurrency.get(code) ?? { code, symbol, bank: 0, cash: 0 };
+    current.cash += totalCashInBaseCurrency;
+    fundsByCurrency.set(code, current);
+  }
+
+  const totalFundsByCurrency = Array.from(fundsByCurrency.values()).sort((a, b) =>
+    a.code.localeCompare(b.code),
+  );
 
   const totalDonations = recentEntries
     .filter((e: RecentEntry) => e.type?.startsWith("donation_"))
@@ -180,10 +214,24 @@ export function DashboardContent({
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalFunds)}</div>
-            <p className="text-xs text-muted-foreground">
-              Bank: {formatCurrency(totalBankFunds)} | Cash: {formatCurrency(totalCashFunds)}
-            </p>
+            {totalFundsByCurrency.length === 0 ? (
+              <div className="text-2xl font-bold">No funds</div>
+            ) : (
+              <div className="space-y-1">
+                {totalFundsByCurrency.map((row) => (
+                  <div key={row.code} className="text-sm">
+                    <span className="font-semibold">
+                      {row.code}: {formatCurrency(row.bank + row.cash, row.symbol)}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      (Bank: {formatCurrency(row.bank, row.symbol)} | Cash:{" "}
+                      {formatCurrency(row.cash, row.symbol)})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -51,6 +51,12 @@ export const cashDepositSchema = baseLedgerSchema.extend({
   bank_account_id: z.string().uuid("Select a bank account"),
 });
 
+export const cashWithdrawalSchema = baseLedgerSchema.extend({
+  type: z.literal("cash_withdrawal"),
+  bank_account_id: z.string().uuid("Select source bank account"),
+  to_user_id: z.string().uuid("Select destination volunteer"),
+});
+
 export const donationInKindSchema = z.object({
   type: z.literal("donation_in_kind"),
   date: z.string().min(1, "Date is required"),
@@ -77,3 +83,4 @@ export type DonationFormData = z.infer<typeof donationSchema>;
 export type ExpenseFormData = z.infer<typeof expenseSchema>;
 export type CashTransferFormData = z.infer<typeof cashTransferSchema>;
 export type CashDepositFormData = z.infer<typeof cashDepositSchema>;
+export type CashWithdrawalFormData = z.infer<typeof cashWithdrawalSchema>;

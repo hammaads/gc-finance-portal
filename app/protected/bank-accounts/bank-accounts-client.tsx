@@ -116,8 +116,18 @@ export function BankAccountsClient({
   const formErrors = (state: Record<string, unknown> | null) =>
     ((state as { error?: Record<string, string[]> })?.error ?? {});
 
+  const aggregateBalancePkr = balances.reduce(
+    (sum, account) => sum + (account.balance_pkr ?? 0),
+    0,
+  );
+
   return (
     <div className="space-y-4">
+      <div className="rounded-md border bg-muted/30 px-4 py-3">
+        <p className="text-sm text-muted-foreground">Total Across All Accounts</p>
+        <p className="text-xl font-semibold">{formatCurrency(aggregateBalancePkr, "Rs")}</p>
+      </div>
+
       {/* Add Account Dialog - only render after mount to avoid Radix ID hydration mismatch */}
       <div className="flex justify-end">
         {mounted ? (

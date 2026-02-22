@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { recordAuditEvent } from "@/lib/actions/audit";
 import { causeSchema } from "@/lib/schemas/causes";
 import { revalidatePath } from "next/cache";
 
@@ -54,6 +55,9 @@ export async function createCause(formData: FormData) {
     description: formData.get("description") || null,
     date: formData.get("date") || null,
     location: formData.get("location") || null,
+    number_of_daigs: formData.get("number_of_daigs") || null,
+    expected_attendees: formData.get("expected_attendees") || null,
+    actual_attendees: formData.get("actual_attendees") || null,
     expected_headcount: formData.get("expected_headcount") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
@@ -62,9 +66,17 @@ export async function createCause(formData: FormData) {
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
 
+  const payload = {
+    ...parsed.data,
+    expected_headcount:
+      parsed.data.expected_headcount ??
+      parsed.data.expected_attendees ??
+      null,
+  };
+
   const { data: cause, error: causeError } = await supabase
     .from("causes")
-    .insert(parsed.data)
+    .insert(payload)
     .select()
     .single();
 
@@ -72,6 +84,15 @@ export async function createCause(formData: FormData) {
     console.error("Failed to create cause:", causeError.message);
     return { error: { name: ["Failed to save. Please try again."] } };
   }
+
+  await recordAuditEvent({
+    actorId: claims.claims.sub as string,
+    tableName: "causes",
+    recordId: cause.id,
+    action: "create",
+    newData: cause,
+    metadata: { module: "causes" },
+  });
 
   const budgetItemsJson = formData.get("budget_items");
   if (budgetItemsJson && typeof budgetItemsJson === "string") {
@@ -123,6 +144,9 @@ export async function updateCause(formData: FormData) {
     description: formData.get("description") || null,
     date: formData.get("date") || null,
     location: formData.get("location") || null,
+    number_of_daigs: formData.get("number_of_daigs") || null,
+    expected_attendees: formData.get("expected_attendees") || null,
+    actual_attendees: formData.get("actual_attendees") || null,
     expected_headcount: formData.get("expected_headcount") || null,
   });
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors };
@@ -132,11 +156,29 @@ export async function updateCause(formData: FormData) {
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) return { error: { name: ["Not authenticated"] } };
 
-  const { error } = await supabase.from("causes").update(rest).eq("id", id!);
+  const updatePayload = {
+    ...rest,
+    expected_headcount:
+      rest.expected_headcount ?? rest.expected_attendees ?? null,
+  };
+
+  const { error } = await supabase
+    .from("causes")
+    .update(updatePayload)
+    .eq("id", id!);
   if (error) {
     console.error("Failed to update cause:", error.message);
     return { error: { name: ["Failed to save. Please try again."] } };
   }
+
+  await recordAuditEvent({
+    actorId: claims.claims.sub as string,
+    tableName: "causes",
+    recordId: id ?? null,
+    action: "update",
+    newData: updatePayload,
+    metadata: { module: "causes" },
+  });
 
   const budgetItemsJson = formData.get("budget_items");
   if (budgetItemsJson && typeof budgetItemsJson === "string" && id) {
@@ -202,14 +244,29 @@ export async function deleteCause(id: string) {
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub) return { error: "Not authenticated" };
 
+  const timestamp = new Date().toISOString();
   const { error } = await supabase
     .from("causes")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({
+      deleted_at: timestamp,
+      voided_at: timestamp,
+      voided_by: claims.claims.sub as string,
+      void_reason: "Voided from drives screen",
+    })
     .eq("id", id);
   if (error) {
     console.error("Failed to delete cause:", error.message);
     return { error: "Failed to delete. Please try again." };
   }
+
+  await recordAuditEvent({
+    actorId: claims.claims.sub as string,
+    tableName: "causes",
+    recordId: id,
+    action: "void",
+    reason: "Voided from drives screen",
+    metadata: { module: "causes" },
+  });
 
   revalidatePath("/protected/drives");
   return { success: true };

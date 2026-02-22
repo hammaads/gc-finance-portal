@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useActionState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Table,
@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -40,6 +41,7 @@ import {
 import {
   Plus,
   Trash2,
+  RotateCcw,
   CalendarIcon,
   Check,
   Loader2,
@@ -50,7 +52,11 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { createExpense, deleteExpense } from "@/lib/actions/expenses";
+import {
+  createExpense,
+  voidExpense,
+  restoreExpense,
+} from "@/lib/actions/expenses";
 import { uploadReceipt } from "@/lib/actions/receipts";
 import { compressImage } from "@/lib/compress-image";
 import { createClient } from "@/lib/supabase/client";
@@ -70,6 +76,10 @@ type Expense = {
   exchange_rate_to_pkr: number | string;
   date: string;
   description: string | null;
+  deleted_at: string | null;
+  void_reason: string | null;
+  voided_at: string | null;
+  restored_at: string | null;
   expense_categories?: { name: string } | null;
   currencies?: { code?: string; symbol?: string } | null;
   causes?: { name: string } | null;
@@ -108,26 +118,35 @@ interface ExpensesClientProps {
   volunteers: Volunteer[];
   itemNames: string[];
   receiptRequired: boolean;
+  showVoided: boolean;
 }
 
 // ── Delete Expense Dialog ──
 
-function DeleteExpenseDialog({ expense }: { expense: Expense }) {
+function VoidExpenseDialog({ expense }: { expense: Expense }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const result = await deleteExpense(expense.id);
+  async function handleVoid() {
+    if (!reason.trim()) {
+      toast.error("Void reason is required");
+      return;
+    }
+
+    setSubmitting(true);
+    const result = await voidExpense(expense.id, reason);
     if ("success" in result && result.success) {
-      toast.success("Expense deleted");
+      toast.success("Expense voided");
       setOpen(false);
+      setReason("");
       router.refresh();
     } else {
-      toast.error("Failed to delete expense");
+      const message = "error" in result ? result.error : "Failed to void expense";
+      toast.error(typeof message === "string" ? message : "Failed to void expense");
     }
-    setDeleting(false);
+    setSubmitting(false);
   }
 
   return (
@@ -139,15 +158,20 @@ function DeleteExpenseDialog({ expense }: { expense: Expense }) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Expense</DialogTitle>
+          <DialogTitle>Void Expense</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete{" "}
-          <span className="font-medium text-foreground">
-            {expense.item_name ?? "this expense"}
-          </span>
-          ? This action cannot be undone.
+          This expense will be excluded from totals. Please provide a reason.
         </p>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Reason</label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Explain why this expense is being voided"
+          />
+        </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">
@@ -156,10 +180,67 @@ function DeleteExpenseDialog({ expense }: { expense: Expense }) {
           </DialogClose>
           <Button
             variant="destructive"
-            onClick={handleDelete}
-            disabled={deleting}
+            onClick={handleVoid}
+            disabled={submitting || !reason.trim()}
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {submitting ? "Voiding..." : "Void Expense"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RestoreExpenseDialog({ expense }: { expense: Expense }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  async function handleRestore() {
+    setRestoring(true);
+    const result = await restoreExpense(expense.id);
+    if ("success" in result && result.success) {
+      toast.success("Expense restored");
+      setOpen(false);
+      router.refresh();
+    } else {
+      const message =
+        "error" in result ? result.error : "Failed to restore expense";
+      toast.error(
+        typeof message === "string" ? message : "Failed to restore expense",
+      );
+    }
+    setRestoring(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <RotateCcw className="size-4 text-emerald-600" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Restore Expense</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Restore this voided expense back into active totals?
+        </p>
+        {expense.void_reason && (
+          <p className="rounded-md bg-muted p-2 text-sm">
+            <span className="font-medium">Void reason: </span>
+            {expense.void_reason}
+          </p>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button onClick={handleRestore} disabled={restoring}>
+            {restoring ? "Restoring..." : "Restore"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -248,6 +329,19 @@ function ReceiptUpload({
 
 // ── Add Expense Dialog ──
 
+export type AddExpenseDialogProps = {
+  categories: ExpenseCategory[];
+  currencies: Currency[];
+  bankAccounts: BankAccount[];
+  causes: Cause[];
+  volunteers: Volunteer[];
+  itemNames: string[];
+  receiptRequired: boolean;
+  defaultCauseId?: string;
+  lockCause?: boolean;
+  triggerLabel?: string;
+};
+
 export function AddExpenseDialog({
   categories,
   currencies,
@@ -256,15 +350,10 @@ export function AddExpenseDialog({
   volunteers,
   itemNames,
   receiptRequired,
-}: {
-  categories: ExpenseCategory[];
-  currencies: Currency[];
-  bankAccounts: BankAccount[];
-  causes: Cause[];
-  volunteers: Volunteer[];
-  itemNames: string[];
-  receiptRequired: boolean;
-}) {
+  defaultCauseId,
+  lockCause = false,
+  triggerLabel = "Add Expense",
+}: AddExpenseDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<"bank" | "cash">("bank");
@@ -272,7 +361,7 @@ export function AddExpenseDialog({
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [causeId, setCauseId] = useState("");
+  const [causeId, setCauseId] = useState(defaultCauseId ?? "");
   const [custodianId, setCustodianId] = useState("");
   const [bankAccountId, setBankAccountId] = useState(
     bankAccounts.length > 0 ? bankAccounts[0].id : "",
@@ -353,7 +442,7 @@ export function AddExpenseDialog({
     setQuantity("1");
     setUnitPrice("");
     setCategoryId("");
-    setCauseId("");
+    setCauseId(defaultCauseId ?? "");
     setCustodianId("");
     setBankAccountId(bankAccounts.length > 0 ? bankAccounts[0].id : "");
     setFromUserId("");
@@ -373,7 +462,7 @@ export function AddExpenseDialog({
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-1 size-4" />
-          Add Expense
+          {triggerLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm gap-0 p-5">
@@ -624,33 +713,44 @@ export function AddExpenseDialog({
           )}
 
           {/* Drive */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              Drive
-            </label>
-            <Select
-              value={causeId || "__general__"}
-              onValueChange={(v) =>
-                setCauseId(v === "__general__" ? "" : v)
-              }
-            >
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="General" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__general__">
-                  General (Inventory)
-                </SelectItem>
-                {causes
-                  .filter((cause) => cause.type === "drive")
-                  .map((cause) => (
-                    <SelectItem key={cause.id} value={cause.id}>
-                      {cause.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {lockCause ? (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Drive
+              </label>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {causes.find((cause) => cause.id === causeId)?.name ?? "Current drive"}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
+                Drive
+              </label>
+              <Select
+                value={causeId || "__general__"}
+                onValueChange={(v) =>
+                  setCauseId(v === "__general__" ? "" : v)
+                }
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="General" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__general__">
+                    General (Inventory)
+                  </SelectItem>
+                  {causes
+                    .filter((cause) => cause.type === "drive")
+                    .map((cause) => (
+                      <SelectItem key={cause.id} value={cause.id}>
+                        {cause.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Custodian (only for general expenses) */}
           {isGeneral && (
@@ -736,12 +836,31 @@ export function ExpensesClient({
   volunteers,
   itemNames,
   receiptRequired,
+  showVoided,
 }: ExpensesClientProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  function handleShowVoidedChange(checked: boolean) {
+    const next = new URLSearchParams(searchParams.toString());
+    if (checked) {
+      next.set("showVoided", "1");
+    } else {
+      next.delete("showVoided");
+    }
+    const query = next.toString();
+    router.push(query ? `?${query}` : "/protected/expenses");
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium">All Expenses</h2>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Switch checked={showVoided} onCheckedChange={handleShowVoidedChange} />
+            Show voided
+          </label>
           <Button variant="outline" size="sm" asChild>
             <Link href="/protected/expenses/bulk-add">
               <TableProperties className="mr-1 size-4" />
@@ -771,6 +890,7 @@ export function ExpensesClient({
             <TableHead>Method</TableHead>
             <TableHead>Drive</TableHead>
             <TableHead>Custodian</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead className="w-16 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -778,26 +898,34 @@ export function ExpensesClient({
           {expenses.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={10}
+                colSpan={11}
                 className="text-center text-muted-foreground"
               >
-                No expenses yet. Add one to get started.
+                {showVoided
+                  ? "No expenses found."
+                  : "No active expenses yet. Add one to get started."}
               </TableCell>
             </TableRow>
           ) : (
             expenses.map((expense) => {
               const isBank = expense.type === "expense_bank";
+              const isVoided = !!expense.deleted_at;
               const pkrValue =
                 Number(expense.amount) *
                 Number(expense.exchange_rate_to_pkr);
 
               return (
-                <TableRow key={expense.id}>
+                <TableRow key={expense.id} className={isVoided ? "opacity-70" : undefined}>
                   <TableCell className="whitespace-nowrap">
                     {formatDate(expense.date)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {expense.item_name ?? "-"}
+                    <Link
+                      href={`/protected/expenses/${expense.id}`}
+                      className="hover:underline"
+                    >
+                      {expense.item_name ?? "-"}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     {expense.expense_categories?.name ?? "-"}
@@ -831,8 +959,26 @@ export function ExpensesClient({
                   <TableCell>
                     {expense.custodian?.name ?? "-"}
                   </TableCell>
+                  <TableCell>
+                    {isVoided ? (
+                      <div className="space-y-1">
+                        <Badge variant="destructive">VOID</Badge>
+                        {expense.void_reason && (
+                          <p className="max-w-48 truncate text-xs text-muted-foreground">
+                            {expense.void_reason}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">Active</Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <DeleteExpenseDialog expense={expense} />
+                    {isVoided ? (
+                      <RestoreExpenseDialog expense={expense} />
+                    ) : (
+                      <VoidExpenseDialog expense={expense} />
+                    )}
                   </TableCell>
                 </TableRow>
               );

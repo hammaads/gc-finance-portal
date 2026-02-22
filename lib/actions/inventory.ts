@@ -1,5 +1,6 @@
 "use server";
 
+import { recordAuditEvent, recordInventoryHistory } from "@/lib/actions/audit";
 import { createClient } from "@/lib/supabase/server";
 import {
   consumeInventorySchema,
@@ -27,6 +28,18 @@ export async function getInventoryByCustodian() {
   return data;
 }
 
+export async function getInventoryHistory(itemKey: string) {
+  const supabase = await createClient();
+  const normalized = itemKey.trim().toLowerCase().replace(/\s+/g, " ");
+  const { data, error } = await supabase
+    .from("inventory_history")
+    .select("*")
+    .eq("item_key", normalized)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
 export async function getCustodyTransfers(ledgerEntryId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -45,6 +58,7 @@ export async function consumeInventory(formData: FormData) {
     ledger_entry_id: formData.get("ledger_entry_id"),
     cause_id: formData.get("cause_id"),
     quantity: formData.get("quantity"),
+    notes: formData.get("notes"),
   };
 
   const parsed = consumeInventorySchema.safeParse(raw);
@@ -52,10 +66,10 @@ export async function consumeInventory(formData: FormData) {
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
-  if (!claims?.claims?.sub)
-    return { error: { quantity: ["Not authenticated"] } };
+  const actorId = claims?.claims?.sub ?? null;
+  if (!actorId) return { error: { quantity: ["Not authenticated"] } };
 
-  // Get the inventory item to check availability and compute unit price
+  // Get the inventory lot to check availability and compute unit price.
   const { data: item, error: itemError } = await supabase
     .from("inventory_current")
     .select("*")
@@ -76,21 +90,60 @@ export async function consumeInventory(formData: FormData) {
     };
   }
 
-  // Compute unit price in PKR for cost allocation
+  const sourceType =
+    (item.source_type as "donated" | "purchased" | null) ?? "purchased";
   const unitPricePkr =
-    Number(item.amount_pkr) / Number(item.purchased_qty);
+    Number(item.amount_pkr) / Math.max(Number(item.purchased_qty), 1);
 
-  const { error } = await supabase.from("inventory_consumption").insert({
-    ledger_entry_id: parsed.data.ledger_entry_id,
-    cause_id: parsed.data.cause_id,
-    quantity: parsed.data.quantity,
-    unit_price_pkr: unitPricePkr,
-    consumed_by: claims.claims.sub as string,
-  });
+  const { data: inserted, error } = await supabase
+    .from("inventory_consumption")
+    .insert({
+      ledger_entry_id: parsed.data.ledger_entry_id,
+      cause_id: parsed.data.cause_id,
+      quantity: parsed.data.quantity,
+      unit_price_pkr: unitPricePkr,
+      consumed_by: actorId,
+      source_type: sourceType,
+      notes: parsed.data.notes,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("Failed to consume inventory:", error.message);
     return { error: { quantity: ["Failed to save. Please try again."] } };
+  }
+
+  await recordAuditEvent({
+    actorId,
+    tableName: "inventory_consumption",
+    recordId: inserted.id,
+    action: "consume",
+    reason: parsed.data.notes,
+    metadata: {
+      source_type: sourceType,
+      quantity: parsed.data.quantity,
+      ledger_entry_id: parsed.data.ledger_entry_id,
+      cause_id: parsed.data.cause_id,
+    },
+  });
+
+  if (item.item_name) {
+    await recordInventoryHistory({
+      actorId,
+      itemName: item.item_name,
+      changeType: "used",
+      source: "drive_consumption",
+      deltaQty: -Number(parsed.data.quantity),
+      referenceTable: "inventory_consumption",
+      referenceId: inserted.id,
+      notes: parsed.data.notes,
+      metadata: {
+        source_type: sourceType,
+        cause_id: parsed.data.cause_id,
+        ledger_entry_id: parsed.data.ledger_entry_id,
+      },
+    });
   }
 
   revalidatePath("/protected/inventory");
@@ -118,10 +171,9 @@ export async function transferCustody(formData: FormData) {
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
-  if (!claims?.claims?.sub)
-    return { error: { quantity: ["Not authenticated"] } };
+  const actorId = claims?.claims?.sub ?? null;
+  if (!actorId) return { error: { quantity: ["Not authenticated"] } };
 
-  // Check that from_volunteer holds enough
   const { data: holdings, error: holdError } = await supabase
     .from("inventory_by_custodian")
     .select("qty_held")
@@ -145,17 +197,58 @@ export async function transferCustody(formData: FormData) {
     };
   }
 
-  const { error } = await supabase.from("custody_transfers").insert({
-    ledger_entry_id: parsed.data.ledger_entry_id,
-    from_volunteer_id: parsed.data.from_volunteer_id,
-    to_volunteer_id: parsed.data.to_volunteer_id,
-    quantity: parsed.data.quantity,
-    transferred_by: claims.claims.sub as string,
-  });
+  const { data: transfer, error } = await supabase
+    .from("custody_transfers")
+    .insert({
+      ledger_entry_id: parsed.data.ledger_entry_id,
+      from_volunteer_id: parsed.data.from_volunteer_id,
+      to_volunteer_id: parsed.data.to_volunteer_id,
+      quantity: parsed.data.quantity,
+      transferred_by: actorId,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("Failed to transfer custody:", error.message);
     return { error: { quantity: ["Failed to save. Please try again."] } };
+  }
+
+  const { data: item } = await supabase
+    .from("inventory_current")
+    .select("item_name")
+    .eq("ledger_entry_id", parsed.data.ledger_entry_id)
+    .single();
+
+  await recordAuditEvent({
+    actorId,
+    tableName: "custody_transfers",
+    recordId: transfer.id,
+    action: "transfer",
+    metadata: {
+      ledger_entry_id: parsed.data.ledger_entry_id,
+      from_volunteer_id: parsed.data.from_volunteer_id,
+      to_volunteer_id: parsed.data.to_volunteer_id,
+      quantity: parsed.data.quantity,
+    },
+  });
+
+  if (item?.item_name) {
+    await recordInventoryHistory({
+      actorId,
+      itemName: item.item_name,
+      changeType: "transfer",
+      source: "manual",
+      deltaQty: 0,
+      referenceTable: "custody_transfers",
+      referenceId: transfer.id,
+      notes: `Transferred ${parsed.data.quantity} between custodians`,
+      metadata: {
+        from_volunteer_id: parsed.data.from_volunteer_id,
+        to_volunteer_id: parsed.data.to_volunteer_id,
+        quantity: parsed.data.quantity,
+      },
+    });
   }
 
   revalidatePath("/protected/inventory");
@@ -174,19 +267,19 @@ export async function adjustInventory(formData: FormData) {
 
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
-  if (!claims?.claims?.sub)
-    return { error: { new_quantity: ["Not authenticated"] } };
+  const actorId = claims?.claims?.sub ?? null;
+  if (!actorId) return { error: { new_quantity: ["Not authenticated"] } };
 
-  // Get current consumed quantity to ensure new_quantity >= consumed
-  const { data: item } = await supabase
-    .from("inventory_current")
-    .select("consumed_qty, purchased_qty")
-    .eq("ledger_entry_id", parsed.data.ledger_entry_id)
-    .single();
+  const { data: consumedAgg } = await supabase
+    .from("inventory_consumption")
+    .select("quantity")
+    .eq("ledger_entry_id", parsed.data.ledger_entry_id);
 
-  // If item not in inventory_current, it may be fully consumed — check ledger directly
-  const consumedQty = item ? Number(item.consumed_qty) : 0;
-  const minQty = consumedQty; // Can't reduce below already-consumed amount
+  const consumedQty = (consumedAgg ?? []).reduce(
+    (sum, row) => sum + Number(row.quantity ?? 0),
+    0,
+  );
+  const minQty = consumedQty;
 
   if (parsed.data.new_quantity < minQty) {
     return {
@@ -198,10 +291,9 @@ export async function adjustInventory(formData: FormData) {
     };
   }
 
-  // Update the quantity on the ledger entry and recompute amount
   const { data: entry, error: entryError } = await supabase
     .from("ledger_entries")
-    .select("unit_price")
+    .select("id, quantity, unit_price, item_name, cause_id, type")
     .eq("id", parsed.data.ledger_entry_id)
     .single();
 
@@ -209,12 +301,15 @@ export async function adjustInventory(formData: FormData) {
     return { error: { new_quantity: ["Expense not found"] } };
   }
 
-  const newAmount = parsed.data.new_quantity * Number(entry.unit_price);
+  const oldQty = Number(entry.quantity ?? 0);
+  const newQty = Number(parsed.data.new_quantity);
+  const delta = newQty - oldQty;
+  const newAmount = newQty * Number(entry.unit_price ?? 0);
 
   const { error } = await supabase
     .from("ledger_entries")
     .update({
-      quantity: parsed.data.new_quantity,
+      quantity: newQty,
       amount: newAmount,
     })
     .eq("id", parsed.data.ledger_entry_id);
@@ -222,6 +317,37 @@ export async function adjustInventory(formData: FormData) {
   if (error) {
     console.error("Failed to adjust inventory:", error.message);
     return { error: { new_quantity: ["Failed to save. Please try again."] } };
+  }
+
+  await recordAuditEvent({
+    actorId,
+    tableName: "ledger_entries",
+    recordId: entry.id,
+    action: "adjust",
+    previousData: { quantity: oldQty },
+    newData: { quantity: newQty, amount: newAmount },
+    metadata: { module: "inventory_adjustment" },
+  });
+
+  const isInventoryBacked =
+    !!entry.item_name &&
+    !entry.cause_id &&
+    (entry.type === "expense_bank" ||
+      entry.type === "expense_cash" ||
+      entry.type === "donation_in_kind");
+
+  if (isInventoryBacked && entry.item_name && delta !== 0) {
+    await recordInventoryHistory({
+      actorId,
+      itemName: entry.item_name,
+      changeType: "adjusted",
+      source: "manual",
+      deltaQty: delta,
+      referenceTable: "ledger_entries",
+      referenceId: entry.id,
+      notes: "Manual inventory adjustment",
+      metadata: { old_quantity: oldQty, new_quantity: newQty },
+    });
   }
 
   revalidatePath("/protected/inventory");
@@ -233,7 +359,7 @@ export async function adjustInventory(formData: FormData) {
 export async function getDriveExpenseBreakdown(causeId: string) {
   const supabase = await createClient();
 
-  // Direct expenses for this drive
+  // Direct expenses for this drive.
   const { data: directExpenses, error: directError } = await supabase
     .from("ledger_entries")
     .select(
@@ -245,11 +371,11 @@ export async function getDriveExpenseBreakdown(causeId: string) {
     .order("date", { ascending: false });
   if (directError) throw directError;
 
-  // Consumed inventory for this drive
+  // Consumed inventory for this drive.
   const { data: consumedItems, error: consumedError } = await supabase
     .from("inventory_consumption")
     .select(
-      "id, quantity, total_pkr, unit_price_pkr, created_at, ledger_entry:ledger_entries!inventory_consumption_ledger_entry_id_fkey(item_name, expense_categories(name))",
+      "id, quantity, total_pkr, unit_price_pkr, source_type, notes, created_at, ledger_entry:ledger_entries!inventory_consumption_ledger_entry_id_fkey(item_name, expense_categories(name))",
     )
     .eq("cause_id", causeId)
     .order("created_at", { ascending: false });
