@@ -51,13 +51,13 @@ const coreNav = [
   { title: "Bank Accounts", href: "/protected/bank-accounts", icon: Landmark },
   { title: "Cash Management", href: "/protected/cash", icon: Wallet },
   { title: "Inventory", href: "/protected/inventory", icon: Package },
+  { title: "Reports", href: "/protected/reports", icon: FileText },
 ];
 
 const planningNav = [
   { title: "Drives & Causes", href: "/protected/drives", icon: Car },
   { title: "Donors", href: "/protected/donors", icon: Users },
   { title: "Projections", href: "/protected/projections", icon: TrendingUp },
-  { title: "Reports", href: "/protected/reports", icon: FileText },
 ];
 
 const systemNav = [
